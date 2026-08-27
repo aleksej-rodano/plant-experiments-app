@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+/* Material Design 3 tokens (light scheme, seeded from plant green #1b5e20) */
+@theme {
+  --font-sans: 'Roboto', system-ui, 'Segoe UI', sans-serif;
+
+  --color-primary: #1b5e20;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #a5d6a7;
+  --color-on-primary-container: #002106;
+
+  --color-secondary: #00897b;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #b2dfdb;
+  --color-on-secondary-container: #00201c;
+
+  --color-tertiary: #d32f2f;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #ffdad6;
+  --color-on-tertiary-container: #410002;
+
+  --color-error: #d32f2f;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #410002;
+
+  --color-background: #fafafa;
+  --color-on-background: #1a1c19;
+  --color-surface: #fafafa;
+  --color-on-surface: #1a1c19;
+  --color-surface-variant: #dee5d9;
+  --color-on-surface-variant: #424940;
+  --color-surface-container: #f0f1ec;
+  --color-outline: #72796f;
+  --color-outline-variant: #c2c9bd;
+
+  --radius-lg: 0.75rem; /* Material 12dp default */
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
