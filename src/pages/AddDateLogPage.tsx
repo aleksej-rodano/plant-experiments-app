@@ -161,7 +161,7 @@ export default function AddDateLogPage() {
               className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant"
             >
               <ImagePlus className="size-5" />
-              Choose JPG or PNG (max 5MB)
+              Choose JPG or PNG
             </button>
           )}
           {errors.image && <span className="text-xs text-error">{errors.image}</span>}
@@ -186,7 +186,7 @@ export default function AddDateLogPage() {
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary disabled:opacity-60"
           >
             {busy && <Loader2 className="size-4 animate-spin" />}
-            Save entry
+            {busy ? (image ? 'Uploading photo…' : 'Saving…') : 'Save entry'}
           </button>
         </div>
       </form>
