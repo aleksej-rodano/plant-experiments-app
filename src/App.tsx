@@ -20,7 +20,9 @@ function FullScreenLoader() {
 
 function RequireAuth() {
   const { user, loading } = useAuth()
-  if (loading) return <FullScreenLoader />
+  // If we already have a (possibly optimistic) session, render straight away —
+  // only block on the loader while we still don't know whether anyone is signed in.
+  if (loading && !user) return <FullScreenLoader />
   return user ? <Outlet /> : <Navigate to="/login" replace />
 }
 
@@ -33,7 +35,7 @@ function App() {
         <Route
           path="/login"
           element={
-            loading ? (
+            loading && !user ? (
               <FullScreenLoader />
             ) : user ? (
               <Navigate to="/experiments" replace />

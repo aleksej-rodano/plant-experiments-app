@@ -8,6 +8,7 @@ import type { Experiment } from '../types/database'
 export default function ExperimentsPage() {
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [loading, setLoading] = useState(true)
+  const [slow, setSlow] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const location = useLocation()
@@ -25,14 +26,35 @@ export default function ExperimentsPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    setSlow(false)
     setError(null)
-    const { data, error } = await supabase
-      .from('experiments')
-      .select()
-      .order('created_at', { ascending: false })
-    if (error) setError(error.message)
-    else setExperiments(data ?? [])
-    setLoading(false)
+
+    const controller = new AbortController()
+    const slowTimer = setTimeout(() => setSlow(true), 4000)
+    const abortTimer = setTimeout(() => controller.abort(), 15000)
+
+    try {
+      const { data, error } = await supabase
+        .from('experiments')
+        .select()
+        .order('created_at', { ascending: false })
+        .abortSignal(controller.signal)
+      if (error) throw error
+      setExperiments(data ?? [])
+    } catch (e) {
+      setError(
+        controller.signal.aborted
+          ? 'The server took too long to respond. Check your connection and retry.'
+          : e instanceof Error
+            ? e.message
+            : 'Failed to load experiments.',
+      )
+    } finally {
+      clearTimeout(slowTimer)
+      clearTimeout(abortTimer)
+      setSlow(false)
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -85,8 +107,13 @@ export default function ExperimentsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16">
+        <div className="flex flex-col items-center gap-3 py-16">
           <Loader2 className="size-6 animate-spin text-primary" />
+          {slow && (
+            <p className="text-sm text-on-surface-variant">
+              Still loading — your connection to the server seems slow.
+            </p>
+          )}
         </div>
       ) : experiments.length === 0 && !error ? (
         <div className="rounded-lg bg-surface-container px-4 py-16 text-center">
