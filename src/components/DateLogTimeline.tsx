@@ -24,15 +24,30 @@ export default function DateLogTimeline({ experimentId, initialLogs }: Props) {
 
   const load = useCallback(async () => {
     setError(null)
-    const { data, error } = await supabase
-      .from('date_logs')
-      .select()
-      .eq('experiment_id', experimentId)
-      .order('log_date', { ascending: false })
-      .order('created_at', { ascending: false })
-    if (error) setError(error.message)
-    else if (data) setLogs(data)
-    setLoading(false)
+    const controller = new AbortController()
+    const abortTimer = setTimeout(() => controller.abort(), 12000)
+    try {
+      const { data, error } = await supabase
+        .from('date_logs')
+        .select()
+        .eq('experiment_id', experimentId)
+        .order('log_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .abortSignal(controller.signal)
+      if (error) throw error
+      if (data) setLogs(data)
+    } catch (e) {
+      setError(
+        controller.signal.aborted
+          ? 'The server took too long to respond.'
+          : e instanceof Error
+            ? e.message
+            : 'Failed to load the timeline.',
+      )
+    } finally {
+      clearTimeout(abortTimer)
+      setLoading(false)
+    }
   }, [experimentId])
 
   useEffect(() => {

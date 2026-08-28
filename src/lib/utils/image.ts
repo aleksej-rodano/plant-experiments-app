@@ -46,13 +46,26 @@ export async function compressImage(file: File): Promise<Blob> {
   }
 }
 
+const UPLOAD_TIMEOUT_MS = 30_000
+
 export async function uploadImage(file: File, userId: string): Promise<string> {
   const blob = await compressImage(file)
   const ext = blob.type === 'image/png' ? 'png' : 'jpg'
   const path = `${userId}/${crypto.randomUUID()}.${ext}`
-  const { error } = await supabase.storage
+
+  // The storage upload can't take an AbortSignal, so race it against a timeout
+  // to fail loudly instead of hanging when the backend is slow to respond.
+  const upload = supabase.storage
     .from(BUCKET)
     .upload(path, blob, { contentType: blob.type || 'image/jpeg' })
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error('Image upload timed out. Check your connection and try again.')),
+      UPLOAD_TIMEOUT_MS,
+    ),
+  )
+
+  const { error } = await Promise.race([upload, timeout])
   if (error) throw error
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 }

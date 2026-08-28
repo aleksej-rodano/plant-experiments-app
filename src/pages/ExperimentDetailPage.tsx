@@ -50,23 +50,46 @@ export default function ExperimentDetailPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
 
-  const load = useCallback(async () => {
-    if (!id) return
-    setLoading(true)
-    setError(null)
-    const { data, error } = await supabase
-      .from('experiments')
-      .select()
-      .eq('id', id)
-      .maybeSingle()
-    if (error) setError(error.message)
-    else setExperiment(data)
-    setLoading(false)
-  }, [id])
+  const load = useCallback(
+    async (opts?: { background?: boolean }) => {
+      if (!id) return
+      if (!opts?.background) setLoading(true)
+      setError(null)
+
+      const controller = new AbortController()
+      const abortTimer = setTimeout(() => controller.abort(), 12000)
+      try {
+        const { data, error } = await supabase
+          .from('experiments')
+          .select()
+          .eq('id', id)
+          .abortSignal(controller.signal)
+          .maybeSingle()
+        if (error) throw error
+        setExperiment(data)
+      } catch (e) {
+        // A background refresh that fails just leaves the seeded row on screen.
+        if (!opts?.background) {
+          setError(
+            controller.signal.aborted
+              ? 'The server took too long to respond. Check your connection and retry.'
+              : e instanceof Error
+                ? e.message
+                : 'Failed to load experiment.',
+          )
+        }
+      } finally {
+        clearTimeout(abortTimer)
+        setLoading(false)
+      }
+    },
+    [id],
+  )
 
   useEffect(() => {
-    if (seededExperiment) return
-    void load()
+    // When the row was handed over from the list (or the add-log flow) render it
+    // immediately and only refresh in the background — no blocking spinner.
+    void load({ background: Boolean(seededExperiment) })
   }, [load, seededExperiment])
 
   useEffect(() => {

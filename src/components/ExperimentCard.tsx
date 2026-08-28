@@ -24,7 +24,11 @@ export default function ExperimentCard({ experiment, onDelete }: Props) {
 
   return (
     <div className="relative flex flex-col overflow-hidden rounded-lg bg-surface-container ring-1 ring-outline-variant">
-      <Link to={`/experiments/${experiment.id}`} className="flex flex-1 flex-col">
+      <Link
+        to={`/experiments/${experiment.id}`}
+        state={{ experiment }}
+        className="flex flex-1 flex-col"
+      >
         <div className="flex aspect-video items-center justify-center bg-surface-variant">
           {experiment.cover_image_url ? (
             <img
