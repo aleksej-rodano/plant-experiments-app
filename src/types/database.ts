@@ -118,6 +118,42 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['tips']['Insert']>
         Relationships: []
       }
+      notes: {
+        Row: {
+          id: string
+          user_id: string
+          body: string
+          image_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          body: string
+          image_url?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['notes']['Insert']>
+        Relationships: []
+      }
+      feeding_logs: {
+        Row: {
+          id: string
+          user_id: string
+          fed_on: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          fed_on?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['feeding_logs']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -131,3 +167,5 @@ export type Experiment = Database['public']['Tables']['experiments']['Row']
 export type DateLog = Database['public']['Tables']['date_logs']['Row']
 export type PestGuide = Database['public']['Tables']['pest_guides']['Row']
 export type Tip = Database['public']['Tables']['tips']['Row']
+export type Note = Database['public']['Tables']['notes']['Row']
+export type FeedingLog = Database['public']['Tables']['feeding_logs']['Row']

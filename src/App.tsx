@@ -6,9 +6,11 @@ import AddDateLogPage from './pages/AddDateLogPage'
 import CreateExperimentPage from './pages/CreateExperimentPage'
 import CreateFolderPage from './pages/CreateFolderPage'
 import ExperimentDetailPage from './pages/ExperimentDetailPage'
+import FertilizerLogPage from './pages/FertilizerLogPage'
 import FolderDetailPage from './pages/FolderDetailPage'
 import FoldersPage from './pages/FoldersPage'
 import LoginPage from './pages/LoginPage'
+import NotesPage from './pages/NotesPage'
 import PestControlPage from './pages/PestControlPage'
 import TipsPage from './pages/TipsPage'
 
@@ -61,8 +63,10 @@ function App() {
               path="/experiments/:id/logs/new"
               element={<AddDateLogPage />}
             />
+            <Route path="/fertilizer-log" element={<FertilizerLogPage />} />
             <Route path="/pest-control" element={<PestControlPage />} />
             <Route path="/tips" element={<TipsPage />} />
+            <Route path="/notes" element={<NotesPage />} />
           </Route>
         </Route>
 

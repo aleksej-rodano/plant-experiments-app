@@ -1,11 +1,13 @@
-import { Bug, Lightbulb, LogOut, Sprout } from 'lucide-react'
+import { Bug, Droplets, Lightbulb, LogOut, NotebookPen, Sprout } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
 
 const NAV = [
   { to: '/experiments', label: 'Experiments', icon: Sprout },
+  { to: '/fertilizer-log', label: 'Fertilizer Log', icon: Droplets },
   { to: '/pest-control', label: 'Pest Control', icon: Bug },
   { to: '/tips', label: 'Tips', icon: Lightbulb },
+  { to: '/notes', label: 'Notes', icon: NotebookPen },
 ]
 
 function navItemClass(isActive: boolean) {
