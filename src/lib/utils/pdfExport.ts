@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import type { DateLog, Experiment, Folder } from '../../types/database'
+import { formatRate, successRate, survivorCount, totalDeaths } from './survival'
 
 /** A4 at ~96dpi, in CSS px — the render width of the hidden template. */
 const TEMPLATE_WIDTH = 794
@@ -123,14 +124,31 @@ function buildTemplate(
     )
   }
 
+  const deaths = totalDeaths(dateLogs)
+  const initialForRate = experiment.plant_count ?? plantCount ?? null
+
   const facts: string[] = []
   if (folder) facts.push(`<strong>Folder:</strong> ${esc(folder.title)}`)
   if (plantCount != null) {
     facts.push(`<strong>Plants:</strong> ${esc(String(plantCount))}`)
   }
+  if (initialForRate != null) {
+    facts.push(
+      `<strong>Surviving:</strong> ${survivorCount(
+        initialForRate,
+        deaths,
+      )}/${initialForRate} (${formatRate(successRate(initialForRate, deaths))})`,
+    )
+  }
+  if (experiment.status) {
+    facts.push(`<strong>Status:</strong> ${esc(experiment.status)}`)
+  }
   if (origin) facts.push(`<strong>Origin:</strong> ${esc(origin)}`)
   if (initialPrice != null) {
     facts.push(`<strong>Initial price:</strong> $${initialPrice.toFixed(2)}`)
+  }
+  if (experiment.started_on) {
+    facts.push(`<strong>Started:</strong> ${formatLogDate(experiment.started_on)}`)
   }
   facts.push(`<strong>Created:</strong> ${formatDate(experiment.created_at)}`)
   blocks.push(
@@ -161,12 +179,30 @@ function buildTemplate(
     )
   } else {
     dateLogs.forEach((log, i) => {
+      const metrics: string[] = []
+      if (log.root_length_mm != null)
+        metrics.push(`Roots ${esc(String(log.root_length_mm))} mm`)
+      if (log.new_leaves != null)
+        metrics.push(`+${esc(String(log.new_leaves))} leaves`)
+      if (log.deaths_count > 0)
+        metrics.push(
+          `${esc(String(log.deaths_count))} died${
+            log.death_cause ? ` (${esc(log.death_cause)})` : ''
+          }`,
+        )
       const item = `
         <div style="border-top:1px solid #c2c9bd;padding-top:16px">
           <div style="font-size:12px;font-weight:700;color:#424940">${formatLogDate(
             log.log_date,
           )}</div>
           <p style="white-space:pre-wrap;margin:6px 0 0">${esc(log.status_details)}</p>
+          ${
+            metrics.length > 0
+              ? `<div style="margin-top:6px;font-size:12px;color:#424940">${metrics.join(
+                  ' &nbsp;·&nbsp; ',
+                )}</div>`
+              : ''
+          }
           ${
             log.image_url
               ? `<img src="${esc(

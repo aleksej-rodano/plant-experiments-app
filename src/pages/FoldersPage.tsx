@@ -3,12 +3,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import FolderCard from '../components/FolderCard'
 import { supabase } from '../lib/supabase'
+import { survivorCount } from '../lib/utils/survival'
 import type { Folder } from '../types/database'
 
 export default function FoldersPage() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [plantTotals, setPlantTotals] = useState<Record<string, number>>({})
+  const [aliveTotals, setAliveTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +38,7 @@ export default function FoldersPage() {
     const abortTimer = setTimeout(() => controller.abort(), 15000)
 
     try {
-      const [foldersRes, expRes] = await Promise.all([
+      const [foldersRes, expRes, deathRes] = await Promise.all([
         supabase
           .from('folders')
           .select()
@@ -44,22 +46,38 @@ export default function FoldersPage() {
           .abortSignal(controller.signal),
         supabase
           .from('experiments')
-          .select('folder_id, plant_count')
+          .select('id, folder_id, plant_count')
+          .abortSignal(controller.signal),
+        supabase
+          .from('date_logs')
+          .select('experiment_id, deaths_count')
           .abortSignal(controller.signal),
       ])
       if (foldersRes.error) throw foldersRes.error
       if (expRes.error) throw expRes.error
+      if (deathRes.error) throw deathRes.error
+
+      const deathsByExp: Record<string, number> = {}
+      for (const row of deathRes.data ?? []) {
+        deathsByExp[row.experiment_id] =
+          (deathsByExp[row.experiment_id] ?? 0) + (row.deaths_count ?? 0)
+      }
 
       const tally: Record<string, number> = {}
       const plants: Record<string, number> = {}
+      const alive: Record<string, number> = {}
       for (const row of expRes.data ?? []) {
         tally[row.folder_id] = (tally[row.folder_id] ?? 0) + 1
         plants[row.folder_id] =
           (plants[row.folder_id] ?? 0) + (row.plant_count ?? 0)
+        alive[row.folder_id] =
+          (alive[row.folder_id] ?? 0) +
+          survivorCount(row.plant_count, deathsByExp[row.id] ?? 0)
       }
       setFolders(foldersRes.data ?? [])
       setCounts(tally)
       setPlantTotals(plants)
+      setAliveTotals(alive)
     } catch (e) {
       setError(
         controller.signal.aborted
@@ -157,6 +175,7 @@ export default function FoldersPage() {
               folder={folder}
               experimentCount={counts[folder.id] ?? 0}
               plantTotal={plantTotals[folder.id] ?? 0}
+              aliveTotal={aliveTotals[folder.id] ?? 0}
               onDelete={handleDelete}
             />
           ))}

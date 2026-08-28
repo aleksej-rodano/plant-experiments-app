@@ -1,4 +1,12 @@
-import { Bug, Droplets, Lightbulb, LogOut, NotebookPen, Sprout } from 'lucide-react'
+import {
+  Bug,
+  Droplets,
+  Lightbulb,
+  LogOut,
+  NotebookPen,
+  Settings,
+  Sprout,
+} from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
 
@@ -29,15 +37,30 @@ export default function Layout() {
           <Sprout className="size-6" />
           <span className="text-lg font-medium">Plant Experiments</span>
         </div>
-        <button
-          type="button"
-          onClick={() => void signOut()}
-          title={user?.email ?? 'Sign out'}
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm hover:bg-on-primary/10"
-        >
-          <LogOut className="size-4" />
-          <span className="hidden sm:inline">Sign out</span>
-        </button>
+        <div className="flex items-center gap-1">
+          <NavLink
+            to="/settings"
+            title="Settings"
+            className={({ isActive }) =>
+              [
+                'flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm hover:bg-on-primary/10',
+                isActive ? 'bg-on-primary/10' : '',
+              ].join(' ')
+            }
+          >
+            <Settings className="size-4" />
+            <span className="hidden sm:inline">Settings</span>
+          </NavLink>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            title={user?.email ?? 'Sign out'}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm hover:bg-on-primary/10"
+          >
+            <LogOut className="size-4" />
+            <span className="hidden sm:inline">Sign out</span>
+          </button>
+        </div>
       </header>
 
       <div className="mx-auto flex w-full max-w-5xl flex-1">

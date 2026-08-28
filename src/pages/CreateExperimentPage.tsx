@@ -9,6 +9,8 @@ import type { Database } from '../types/database'
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
 
+const today = () => new Date().toISOString().slice(0, 10)
+
 export default function CreateExperimentPage() {
   const { folderId } = useParams<{ folderId: string }>()
   const { user } = useAuth()
@@ -16,6 +18,7 @@ export default function CreateExperimentPage() {
 
   const [title, setTitle] = useState('')
   const [plantCount, setPlantCount] = useState('')
+  const [startedOn, setStartedOn] = useState(today)
   const [notes, setNotes] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -23,6 +26,7 @@ export default function CreateExperimentPage() {
   const [errors, setErrors] = useState<{
     title?: string
     plantCount?: string
+    startedOn?: string
     image?: string
   }>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -60,12 +64,19 @@ export default function CreateExperimentPage() {
     e.preventDefault()
     setSubmitError(null)
 
-    const nextErrors: { title?: string; plantCount?: string } = {}
+    const nextErrors: {
+      title?: string
+      plantCount?: string
+      startedOn?: string
+    } = {}
     if (!title.trim()) nextErrors.title = 'Name is required.'
     const count = Number(plantCount)
     if (!plantCount.trim()) nextErrors.plantCount = 'Plant count is required.'
     else if (!Number.isInteger(count) || count < 1)
       nextErrors.plantCount = 'Enter a whole number of at least 1.'
+    if (!startedOn) nextErrors.startedOn = 'Pick a start date.'
+    else if (startedOn > today())
+      nextErrors.startedOn = 'Start date cannot be in the future.'
     setErrors((prev) => ({ ...prev, ...nextErrors }))
     if (Object.keys(nextErrors).length > 0) return
 
@@ -86,6 +97,7 @@ export default function CreateExperimentPage() {
         folder_id: folderId,
         title: title.trim(),
         plant_count: Number(plantCount),
+        started_on: startedOn,
         notes: notes.trim() || null,
         cover_image_url: coverUrl,
       }
@@ -149,6 +161,20 @@ export default function CreateExperimentPage() {
           />
           {errors.plantCount && (
             <span className="text-xs text-error">{errors.plantCount}</span>
+          )}
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Start date *
+          <input
+            type="date"
+            value={startedOn}
+            max={today()}
+            onChange={(e) => setStartedOn(e.target.value)}
+            className={inputClass}
+          />
+          {errors.startedOn && (
+            <span className="text-xs text-error">{errors.startedOn}</span>
           )}
         </label>
 

@@ -3,14 +3,36 @@ import {
   CheckCircle2,
   FileDown,
   Loader2,
+  Pencil,
   Plus,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DateLogTimeline from '../components/DateLogTimeline'
+import MeasurementsChart from '../components/MeasurementsChart'
 import { supabase } from '../lib/supabase'
-import type { DateLog, Experiment, Folder } from '../types/database'
+import {
+  formatRate,
+  successRate,
+  survivorCount,
+  totalDeaths,
+} from '../lib/utils/survival'
+import type { DateLog, Experiment, ExperimentStatus, Folder } from '../types/database'
+
+const STATUS_STYLE: Record<ExperimentStatus, string> = {
+  ongoing: 'bg-surface-variant text-on-surface-variant',
+  succeeded: 'bg-secondary-container text-on-secondary-container',
+  failed: 'bg-error-container text-on-error-container',
+}
+
+function formatDate(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
 
 function BackLink({ to, label }: { to: string; label: string }) {
   return (
@@ -35,15 +57,14 @@ export default function ExperimentDetailPage() {
     (location.state as {
       experiment?: Experiment
       folder?: Folder
-      newLog?: DateLog
     } | null) ?? {},
   )
   const seededExperiment = handoff.current.experiment
-  const seedLogs = handoff.current.newLog ? [handoff.current.newLog] : undefined
 
   const [experiment, setExperiment] = useState<Experiment | null>(
     seededExperiment ?? null,
   )
+  const [timelineLogs, setTimelineLogs] = useState<DateLog[]>([])
   const [folder, setFolder] = useState<Folder | null>(
     handoff.current.folder ?? null,
   )
@@ -56,6 +77,21 @@ export default function ExperimentDetailPage() {
 
   const folderId = experiment?.folder_id ?? folder?.id ?? null
   const backTo = folderId ? `/folders/${folderId}` : '/experiments'
+
+  const handleLogsChange = useCallback((next: DateLog[]) => {
+    setTimelineLogs(next)
+  }, [])
+
+  const stats = useMemo(() => {
+    const initial = experiment?.plant_count ?? null
+    const deaths = totalDeaths(timelineLogs)
+    return {
+      deaths,
+      alive: survivorCount(initial, deaths),
+      rate: successRate(initial, deaths),
+      initial,
+    }
+  }, [experiment?.plant_count, timelineLogs])
 
   const load = useCallback(
     async (opts?: { background?: boolean }) => {
@@ -217,11 +253,40 @@ export default function ExperimentDetailPage() {
           {folder && (
             <p className="text-sm text-on-surface-variant">{folder.title}</p>
           )}
-          <h1 className="text-2xl font-medium text-on-surface">
-            {experiment.title}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-medium text-on-surface">
+              {experiment.title}
+            </h1>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                STATUS_STYLE[experiment.status] ?? STATUS_STYLE.ongoing
+              }`}
+            >
+              {experiment.status}
+            </span>
+          </div>
+          <p className="mt-1 text-sm text-on-surface-variant">
+            {experiment.started_on && `Started ${formatDate(experiment.started_on)}`}
+            {experiment.started_on && stats.initial != null && ' · '}
+            {stats.initial != null && (
+              <>
+                <span className="font-medium text-on-surface">
+                  {stats.alive}/{stats.initial}
+                </span>{' '}
+                alive ({formatRate(stats.rate)})
+              </>
+            )}
+          </p>
         </div>
         <div className="flex gap-2">
+          <Link
+            to={`/experiments/${experiment.id}/edit`}
+            state={{ experiment }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+          >
+            <Pencil className="size-4" />
+            <span className="hidden sm:inline">Edit</span>
+          </Link>
           <button
             type="button"
             onClick={() => void handleExport()}
@@ -265,8 +330,21 @@ export default function ExperimentDetailPage() {
         </p>
       )}
 
+      {timelineLogs.some(
+        (l) => l.root_length_mm != null || l.new_leaves != null,
+      ) && (
+        <div className="mt-4">
+          <MeasurementsChart logs={timelineLogs} />
+        </div>
+      )}
+
       <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">Timeline</h2>
-      <DateLogTimeline experimentId={experiment.id} initialLogs={seedLogs} />
+      <DateLogTimeline
+        experimentId={experiment.id}
+        experiment={experiment}
+        folder={folder}
+        onLogsChange={handleLogsChange}
+      />
 
       <div className="mt-8 border-t border-outline-variant pt-4">
         {confirmingDelete ? (

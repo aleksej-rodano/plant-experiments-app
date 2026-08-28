@@ -7,6 +7,7 @@ interface Props {
   folder: Folder
   experimentCount?: number
   plantTotal?: number
+  aliveTotal?: number
   onDelete: (id: string) => Promise<void>
 }
 
@@ -14,6 +15,7 @@ export default function FolderCard({
   folder,
   experimentCount,
   plantTotal,
+  aliveTotal,
   onDelete,
 }: Props) {
   const [confirming, setConfirming] = useState(false)
@@ -55,7 +57,10 @@ export default function FolderCard({
           {experimentCount != null && (
             <p className="text-sm text-on-surface-variant">
               {experimentCount} experiment{experimentCount === 1 ? '' : 's'}
-              {plantTotal != null && ` · ${plantTotal} plant${plantTotal === 1 ? '' : 's'}`}
+              {plantTotal != null &&
+                (aliveTotal != null
+                  ? ` · ${aliveTotal}/${plantTotal} alive`
+                  : ` · ${plantTotal} plant${plantTotal === 1 ? '' : 's'}`)}
             </p>
           )}
           {folder.origin && (

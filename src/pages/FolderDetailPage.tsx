@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { formatRate, survivorCount } from '../lib/utils/survival'
 import type { Experiment, Folder } from '../types/database'
 
 function BackLink() {
@@ -39,6 +40,7 @@ export default function FolderDetailPage() {
 
   const [folder, setFolder] = useState<Folder | null>(seeded.current)
   const [experiments, setExperiments] = useState<Experiment[]>([])
+  const [deathsByExp, setDeathsByExp] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(!seeded.current)
   const [expLoading, setExpLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +52,11 @@ export default function FolderDetailPage() {
     (sum, e) => sum + (e.plant_count ?? 0),
     0,
   )
+  const aliveFor = (exp: Experiment) =>
+    survivorCount(exp.plant_count, deathsByExp[exp.id] ?? 0)
+  const totalAlive = experiments.reduce((sum, e) => sum + aliveFor(e), 0)
+  const folderRate =
+    totalPlants > 0 ? formatRate(totalAlive / totalPlants) : '—'
 
   const load = useCallback(
     async (opts?: { background?: boolean }) => {
@@ -78,7 +85,27 @@ export default function FolderDetailPage() {
         if (folderRes.error) throw folderRes.error
         if (expRes.error) throw expRes.error
         setFolder(folderRes.data)
-        setExperiments(expRes.data ?? [])
+        const exps = expRes.data ?? []
+        setExperiments(exps)
+
+        if (exps.length > 0) {
+          const { data: logRows } = await supabase
+            .from('date_logs')
+            .select('experiment_id, deaths_count')
+            .in(
+              'experiment_id',
+              exps.map((e) => e.id),
+            )
+            .abortSignal(controller.signal)
+          const tally: Record<string, number> = {}
+          for (const row of logRows ?? []) {
+            tally[row.experiment_id] =
+              (tally[row.experiment_id] ?? 0) + (row.deaths_count ?? 0)
+          }
+          setDeathsByExp(tally)
+        } else {
+          setDeathsByExp({})
+        }
       } catch (e) {
         if (!opts?.background) {
           setError(
@@ -210,17 +237,29 @@ export default function FolderDetailPage() {
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+        <div className="rounded-lg bg-primary-container px-3 py-2 text-on-primary-container">
+          <dt className="flex items-center gap-1 text-xs">
+            <Sprout className="size-3.5" />
+            Surviving plants
+          </dt>
+          <dd className="mt-0.5 text-lg font-medium">
+            {totalAlive}
+            <span className="text-sm font-normal">
+              {' / '}
+              {totalPlants} ({folderRate})
+            </span>
+          </dd>
+        </div>
         <div className="rounded-lg bg-surface-container px-3 py-2">
           <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-            <Sprout className="size-3.5" />
-            Plants total
+            <FlaskConical className="size-3.5" />
+            Experiments
           </dt>
           <dd className="mt-0.5 text-on-surface">
-            {totalPlants}
+            {experiments.length}
             <span className="text-xs text-on-surface-variant">
               {' '}
-              across {experiments.length} experiment
-              {experiments.length === 1 ? '' : 's'}
+              · {totalPlants} plant{totalPlants === 1 ? '' : 's'} started
             </span>
           </dd>
         </div>
@@ -290,8 +329,8 @@ export default function FolderDetailPage() {
                     {exp.title}
                   </span>
                   <span className="block truncate text-sm text-on-surface-variant">
-                    {exp.plant_count ?? 0} plant
-                    {(exp.plant_count ?? 0) === 1 ? '' : 's'}
+                    {aliveFor(exp)}/{exp.plant_count ?? 0} alive
+                    {exp.status !== 'ongoing' ? ` · ${exp.status}` : ''}
                     {exp.notes ? ` · ${exp.notes}` : ''}
                   </span>
                 </span>

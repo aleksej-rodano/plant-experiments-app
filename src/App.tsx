@@ -5,6 +5,8 @@ import { useAuth } from './lib/hooks/useAuth'
 import AddDateLogPage from './pages/AddDateLogPage'
 import CreateExperimentPage from './pages/CreateExperimentPage'
 import CreateFolderPage from './pages/CreateFolderPage'
+import EditDateLogPage from './pages/EditDateLogPage'
+import EditExperimentPage from './pages/EditExperimentPage'
 import EditFolderPage from './pages/EditFolderPage'
 import ExperimentDetailPage from './pages/ExperimentDetailPage'
 import FertilizerLogPage from './pages/FertilizerLogPage'
@@ -13,6 +15,7 @@ import FoldersPage from './pages/FoldersPage'
 import LoginPage from './pages/LoginPage'
 import NotesPage from './pages/NotesPage'
 import PestControlPage from './pages/PestControlPage'
+import SettingsPage from './pages/SettingsPage'
 import TipsPage from './pages/TipsPage'
 
 function FullScreenLoader() {
@@ -65,9 +68,18 @@ function App() {
             />
             <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
             <Route
+              path="/experiments/:id/edit"
+              element={<EditExperimentPage />}
+            />
+            <Route
               path="/experiments/:id/logs/new"
               element={<AddDateLogPage />}
             />
+            <Route
+              path="/experiments/:id/logs/:logId/edit"
+              element={<EditDateLogPage />}
+            />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/fertilizer-log" element={<FertilizerLogPage />} />
             <Route path="/pest-control" element={<PestControlPage />} />
             <Route path="/tips" element={<TipsPage />} />

@@ -1,6 +1,8 @@
 // Schema mirrors the existing Supabase project (probed from the live tables).
 // Regenerate with `npx supabase gen types typescript` once CLI access is set up.
 
+export type ExperimentStatus = 'ongoing' | 'succeeded' | 'failed'
+
 export interface Database {
   public: {
     Tables: {
@@ -43,6 +45,8 @@ export interface Database {
           initial_price: number | null
           notes: string | null
           cover_image_url: string | null
+          started_on: string
+          status: ExperimentStatus
           created_at: string
           updated_at: string
         }
@@ -56,6 +60,8 @@ export interface Database {
           initial_price?: number | null
           notes?: string | null
           cover_image_url?: string | null
+          started_on?: string
+          status?: ExperimentStatus
           created_at?: string
           updated_at?: string
         }
@@ -69,6 +75,10 @@ export interface Database {
           log_date: string
           status_details: string
           image_url: string | null
+          root_length_mm: number | null
+          new_leaves: number | null
+          deaths_count: number
+          death_cause: string | null
           created_at: string
           updated_at: string
         }
@@ -78,6 +88,10 @@ export interface Database {
           log_date: string
           status_details: string
           image_url?: string | null
+          root_length_mm?: number | null
+          new_leaves?: number | null
+          deaths_count?: number
+          death_cause?: string | null
           created_at?: string
           updated_at?: string
         }
