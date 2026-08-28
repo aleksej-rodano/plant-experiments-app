@@ -248,6 +248,17 @@ export default function ExperimentDetailPage() {
         </div>
       </div>
 
+      {experiment.cover_image_url && (
+        <div className="mt-3 aspect-video overflow-hidden rounded-lg bg-surface-variant">
+          <img
+            src={experiment.cover_image_url}
+            alt={experiment.title}
+            className="size-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      )}
+
       {experiment.notes && (
         <p className="mt-3 whitespace-pre-wrap rounded-lg bg-surface-container px-3 py-2 text-sm text-on-surface">
           {experiment.notes}

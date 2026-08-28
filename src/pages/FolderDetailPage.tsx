@@ -5,6 +5,7 @@ import {
   FlaskConical,
   Loader2,
   MapPin,
+  Pencil,
   Plus,
   Sprout,
   Tag,
@@ -188,14 +189,24 @@ export default function FolderDetailPage() {
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-2xl font-medium text-on-surface">{folder.title}</h1>
-        <Link
-          to={`/folders/${folder.id}/experiments/new`}
-          state={{ folder }}
-          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
-        >
-          <Plus className="size-4" />
-          <span className="hidden sm:inline">New Experiment</span>
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            to={`/folders/${folder.id}/edit`}
+            state={{ folder }}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+          >
+            <Pencil className="size-4" />
+            <span className="hidden sm:inline">Edit</span>
+          </Link>
+          <Link
+            to={`/folders/${folder.id}/experiments/new`}
+            state={{ folder }}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
+          >
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">New Experiment</span>
+          </Link>
+        </div>
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
@@ -266,7 +277,15 @@ export default function FolderDetailPage() {
                 state={{ experiment: exp, folder }}
                 className="flex items-center justify-between gap-3 rounded-lg bg-surface-container px-4 py-3 hover:opacity-90"
               >
-                <span className="min-w-0">
+                {exp.cover_image_url && (
+                  <img
+                    src={exp.cover_image_url}
+                    alt=""
+                    className="size-12 shrink-0 rounded-lg object-cover"
+                    loading="lazy"
+                  />
+                )}
+                <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-on-surface">
                     {exp.title}
                   </span>

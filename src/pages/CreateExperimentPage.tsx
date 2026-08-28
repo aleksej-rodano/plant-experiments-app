@@ -1,8 +1,9 @@
-import { ArrowLeft, Loader2 } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Database } from '../types/database'
 
 const inputClass =
@@ -16,13 +17,44 @@ export default function CreateExperimentPage() {
   const [title, setTitle] = useState('')
   const [plantCount, setPlantCount] = useState('')
   const [notes, setNotes] = useState('')
-  const [errors, setErrors] = useState<{ title?: string; plantCount?: string }>(
-    {},
-  )
+  const [image, setImage] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [errors, setErrors] = useState<{
+    title?: string
+    plantCount?: string
+    image?: string
+  }>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   const backTo = folderId ? `/folders/${folderId}` : '/experiments'
+
+  useEffect(() => {
+    if (!image) {
+      setPreviewUrl(null)
+      return
+    }
+    const url = URL.createObjectURL(image)
+    setPreviewUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [image])
+
+  function pickImage(file: File | undefined) {
+    if (!file) return
+    const problem = validateImage(file)
+    if (problem) {
+      setErrors((e) => ({ ...e, image: problem }))
+      return
+    }
+    setErrors((e) => ({ ...e, image: undefined }))
+    setImage(file)
+  }
+
+  function clearImage() {
+    setImage(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -34,7 +66,7 @@ export default function CreateExperimentPage() {
     if (!plantCount.trim()) nextErrors.plantCount = 'Plant count is required.'
     else if (!Number.isInteger(count) || count < 1)
       nextErrors.plantCount = 'Enter a whole number of at least 1.'
-    setErrors(nextErrors)
+    setErrors((prev) => ({ ...prev, ...nextErrors }))
     if (Object.keys(nextErrors).length > 0) return
 
     if (!folderId) {
@@ -48,12 +80,14 @@ export default function CreateExperimentPage() {
 
     setBusy(true)
     try {
+      const coverUrl = image ? await uploadImage(image, user.id) : null
       const payload: Database['public']['Tables']['experiments']['Insert'] = {
         user_id: user.id,
         folder_id: folderId,
         title: title.trim(),
         plant_count: Number(plantCount),
         notes: notes.trim() || null,
+        cover_image_url: coverUrl,
       }
       const { error } = await supabase.from('experiments').insert(payload)
       if (error) throw error
@@ -128,6 +162,46 @@ export default function CreateExperimentPage() {
           />
         </label>
 
+        <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Initial photo
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            onChange={(e) => pickImage(e.target.files?.[0])}
+            className="hidden"
+          />
+          {previewUrl ? (
+            <div className="relative overflow-hidden rounded-lg ring-1 ring-outline-variant">
+              <img
+                src={previewUrl}
+                alt="Initial photo preview"
+                className="aspect-video w-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={clearImage}
+                aria-label="Remove photo"
+                className="absolute right-2 top-2 rounded-lg bg-surface/80 p-1.5 text-on-surface-variant backdrop-blur hover:bg-surface hover:text-error"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant"
+            >
+              <ImagePlus className="size-5" />
+              Choose JPG or PNG
+            </button>
+          )}
+          {errors.image && (
+            <span className="text-xs text-error">{errors.image}</span>
+          )}
+        </div>
+
         {submitError && (
           <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
             {submitError}
@@ -147,7 +221,7 @@ export default function CreateExperimentPage() {
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary disabled:opacity-60"
           >
             {busy && <Loader2 className="size-4 animate-spin" />}
-            {busy ? 'Saving…' : 'Save experiment'}
+            {busy ? (image ? 'Uploading photo…' : 'Saving…') : 'Save experiment'}
           </button>
         </div>
       </form>

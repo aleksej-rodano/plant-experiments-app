@@ -5,6 +5,7 @@ import { useAuth } from './lib/hooks/useAuth'
 import AddDateLogPage from './pages/AddDateLogPage'
 import CreateExperimentPage from './pages/CreateExperimentPage'
 import CreateFolderPage from './pages/CreateFolderPage'
+import EditFolderPage from './pages/EditFolderPage'
 import ExperimentDetailPage from './pages/ExperimentDetailPage'
 import FertilizerLogPage from './pages/FertilizerLogPage'
 import FolderDetailPage from './pages/FolderDetailPage'
@@ -54,6 +55,10 @@ function App() {
             <Route path="/experiments" element={<FoldersPage />} />
             <Route path="/folders/new" element={<CreateFolderPage />} />
             <Route path="/folders/:folderId" element={<FolderDetailPage />} />
+            <Route
+              path="/folders/:folderId/edit"
+              element={<EditFolderPage />}
+            />
             <Route
               path="/folders/:folderId/experiments/new"
               element={<CreateExperimentPage />}
