@@ -1,6 +1,8 @@
 import { Bug, ChevronDown, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import PestTreatmentGuide from '../components/PestTreatmentGuide'
+import PestTreatmentGuide, {
+  hasPestProtocol,
+} from '../components/PestTreatmentGuide'
 import { supabase } from '../lib/supabase'
 import type { PestGuide } from '../types/database'
 
@@ -112,10 +114,14 @@ export default function PestControlPage() {
                       </>
                     )}
 
-                    <h3 className="mb-3 text-sm font-medium text-on-surface-variant">
-                      Full treatment protocol
-                    </h3>
-                    <PestTreatmentGuide />
+                    {hasPestProtocol(guide.pest_name) && (
+                      <>
+                        <h3 className="mb-3 text-sm font-medium text-on-surface-variant">
+                          Full treatment protocol
+                        </h3>
+                        <PestTreatmentGuide pestName={guide.pest_name} />
+                      </>
+                    )}
                   </div>
                 )}
               </li>
