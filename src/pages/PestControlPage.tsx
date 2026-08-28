@@ -1,6 +1,6 @@
-import { Bug, ChevronRight, Loader2 } from 'lucide-react'
+import { Bug, ChevronDown, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import PestDetailModal from '../components/PestDetailModal'
+import PestTreatmentGuide from '../components/PestTreatmentGuide'
 import { supabase } from '../lib/supabase'
 import type { PestGuide } from '../types/database'
 
@@ -8,7 +8,7 @@ export default function PestControlPage() {
   const [guides, setGuides] = useState<PestGuide[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [selected, setSelected] = useState<PestGuide | null>(null)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -72,29 +72,56 @@ export default function PestControlPage() {
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {guides.map((guide) => (
-            <li key={guide.id}>
-              <button
-                type="button"
-                onClick={() => setSelected(guide)}
-                className="flex w-full items-center justify-between gap-3 rounded-lg bg-surface-container px-4 py-3 text-left hover:opacity-90"
+          {guides.map((guide) => {
+            const open = expanded === guide.id
+            return (
+              <li
+                key={guide.id}
+                className="overflow-hidden rounded-lg bg-surface-container"
               >
-                <span className="font-medium text-on-surface">
-                  {guide.pest_name}
-                </span>
-                <span className="flex shrink-0 items-center gap-1 text-sm text-on-surface-variant">
-                  {guide.treatment_steps.length} step
-                  {guide.treatment_steps.length === 1 ? '' : 's'}
-                  <ChevronRight className="size-4" />
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setExpanded(open ? null : guide.id)}
+                  className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+                >
+                  <span className="font-medium text-on-surface">
+                    {guide.pest_name}
+                  </span>
+                  <ChevronDown
+                    className={`size-4 shrink-0 text-on-surface-variant transition-transform ${
+                      open ? 'rotate-180' : ''
+                    }`}
+                  />
+                </button>
 
-      {selected && (
-        <PestDetailModal guide={selected} onClose={() => setSelected(null)} />
+                {open && (
+                  <div className="border-t border-outline-variant px-4 py-4">
+                    {guide.treatment_steps.length > 0 && (
+                      <>
+                        <h3 className="mb-2 text-sm font-medium text-on-surface-variant">
+                          Quick treatment steps
+                        </h3>
+                        <ol className="mb-5 flex list-decimal flex-col gap-1.5 pl-5 text-sm text-on-surface">
+                          {guide.treatment_steps.map((step, i) => (
+                            <li key={i} className="pl-1">
+                              {step}
+                            </li>
+                          ))}
+                        </ol>
+                      </>
+                    )}
+
+                    <h3 className="mb-3 text-sm font-medium text-on-surface-variant">
+                      Full treatment protocol
+                    </h3>
+                    <PestTreatmentGuide />
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       )}
     </section>
   )
