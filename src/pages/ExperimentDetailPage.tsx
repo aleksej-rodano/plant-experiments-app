@@ -48,6 +48,7 @@ export default function ExperimentDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   const load = useCallback(async () => {
     if (!id) return
@@ -76,6 +77,28 @@ export default function ExperimentDetailPage() {
     const t = setTimeout(() => setToast(null), 3000)
     return () => clearTimeout(t)
   }, [location.state, navigate])
+
+  async function handleExport() {
+    if (!experiment) return
+    setExporting(true)
+    setError(null)
+    try {
+      const { data, error } = await supabase
+        .from('date_logs')
+        .select()
+        .eq('experiment_id', experiment.id)
+        .order('log_date', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (error) throw new Error(error.message)
+      // Lazy-loaded: keeps jspdf + html2canvas (~1 MB) out of the initial bundle.
+      const { exportExperimentToPDF } = await import('../lib/utils/pdfExport')
+      await exportExperimentToPDF(experiment, data ?? [])
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'PDF export failed.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   async function handleDelete() {
     if (!id) return
@@ -157,12 +180,18 @@ export default function ExperimentDetailPage() {
         <div className="flex gap-2">
           <button
             type="button"
-            disabled
-            title="PDF export arrives in Task 5"
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline disabled:opacity-50"
+            onClick={() => void handleExport()}
+            disabled={exporting}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
           >
-            <FileDown className="size-4" />
-            <span className="hidden sm:inline">Export PDF</span>
+            {exporting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileDown className="size-4" />
+            )}
+            <span className="hidden sm:inline">
+              {exporting ? 'Exporting…' : 'Export PDF'}
+            </span>
           </button>
           <Link
             to={`/experiments/${experiment.id}/logs/new`}
