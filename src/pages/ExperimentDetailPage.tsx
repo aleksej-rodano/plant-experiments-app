@@ -9,11 +9,11 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DateLogTimeline from '../components/DateLogTimeline'
 import { supabase } from '../lib/supabase'
-import type { Experiment } from '../types/database'
+import type { DateLog, Experiment } from '../types/database'
 
 function BackLink() {
   return (
@@ -32,8 +32,18 @@ export default function ExperimentDetailPage() {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const [experiment, setExperiment] = useState<Experiment | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Data handed over from the "Add Log Entry" flow, captured once on mount so it
+  // survives the state-clearing navigation in the toast effect below.
+  const handoff = useRef(
+    (location.state as { experiment?: Experiment; newLog?: DateLog } | null) ?? {},
+  )
+  const seededExperiment = handoff.current.experiment
+  const seedLogs = handoff.current.newLog ? [handoff.current.newLog] : undefined
+
+  const [experiment, setExperiment] = useState<Experiment | null>(
+    seededExperiment ?? null,
+  )
+  const [loading, setLoading] = useState(!seededExperiment)
   const [error, setError] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -54,8 +64,9 @@ export default function ExperimentDetailPage() {
   }, [id])
 
   useEffect(() => {
+    if (seededExperiment) return
     void load()
-  }, [load])
+  }, [load, seededExperiment])
 
   useEffect(() => {
     const state = location.state as { toast?: string } | null
@@ -155,6 +166,7 @@ export default function ExperimentDetailPage() {
           </button>
           <Link
             to={`/experiments/${experiment.id}/logs/new`}
+            state={{ experiment }}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
           >
             <Plus className="size-4" />
@@ -198,7 +210,7 @@ export default function ExperimentDetailPage() {
       )}
 
       <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">Timeline</h2>
-      <DateLogTimeline experimentId={experiment.id} />
+      <DateLogTimeline experimentId={experiment.id} initialLogs={seedLogs} />
 
       <div className="mt-8 border-t border-outline-variant pt-4">
         {confirmingDelete ? (

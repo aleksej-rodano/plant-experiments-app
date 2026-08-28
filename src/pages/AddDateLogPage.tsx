@@ -1,9 +1,10 @@
 import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
+import type { Experiment } from '../types/database'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
@@ -14,6 +15,8 @@ export default function AddDateLogPage() {
   const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const experiment = (location.state as { experiment?: Experiment } | null)?.experiment
 
   const [logDate, setLogDate] = useState(today)
   const [statusDetails, setStatusDetails] = useState('')
@@ -73,16 +76,23 @@ export default function AddDateLogPage() {
     setBusy(true)
     try {
       const imageUrl = image ? await uploadImage(image, user.id) : null
-      const { error } = await supabase.from('date_logs').insert({
-        experiment_id: id,
-        log_date: logDate,
-        status_details: statusDetails.trim(),
-        image_url: imageUrl,
-      })
+      // One round trip: insert and read the row back, then hand both the
+      // experiment (from route state) and the new log to the detail page so
+      // it renders with zero further requests.
+      const { data, error } = await supabase
+        .from('date_logs')
+        .insert({
+          experiment_id: id,
+          log_date: logDate,
+          status_details: statusDetails.trim(),
+          image_url: imageUrl,
+        })
+        .select()
+        .single()
       if (error) throw error
       navigate(`/experiments/${id}`, {
         replace: true,
-        state: { toast: 'Log entry added.' },
+        state: { toast: 'Log entry added.', experiment, newLog: data },
       })
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Could not save log entry.')

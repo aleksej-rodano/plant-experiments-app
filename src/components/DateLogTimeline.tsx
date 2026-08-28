@@ -5,6 +5,8 @@ import type { DateLog } from '../types/database'
 
 interface Props {
   experimentId: string
+  /** Render these immediately (no spinner) while the real list loads in the background. */
+  initialLogs?: DateLog[]
 }
 
 function formatLogDate(value: string) {
@@ -15,13 +17,12 @@ function formatLogDate(value: string) {
   })
 }
 
-export default function DateLogTimeline({ experimentId }: Props) {
-  const [logs, setLogs] = useState<DateLog[]>([])
-  const [loading, setLoading] = useState(true)
+export default function DateLogTimeline({ experimentId, initialLogs }: Props) {
+  const [logs, setLogs] = useState<DateLog[]>(initialLogs ?? [])
+  const [loading, setLoading] = useState(initialLogs == null)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    setLoading(true)
     setError(null)
     const { data, error } = await supabase
       .from('date_logs')
@@ -30,7 +31,7 @@ export default function DateLogTimeline({ experimentId }: Props) {
       .order('log_date', { ascending: false })
       .order('created_at', { ascending: false })
     if (error) setError(error.message)
-    else setLogs(data ?? [])
+    else if (data) setLogs(data)
     setLoading(false)
   }, [experimentId])
 
@@ -46,7 +47,7 @@ export default function DateLogTimeline({ experimentId }: Props) {
     )
   }
 
-  if (error) {
+  if (error && logs.length === 0) {
     return (
       <div className="flex items-center justify-between gap-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
         <span>{error}</span>
