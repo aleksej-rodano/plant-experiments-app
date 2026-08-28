@@ -1,7 +1,14 @@
 -- Run this in the Supabase SQL editor (Dashboard -> SQL Editor -> New query).
 -- It is idempotent-ish: safe to run once. Adds the Folders layer above Experiments
 -- and a one-time image slot on pest_guides.
+--
+-- Wrapped in a transaction: if any statement fails the whole thing rolls back and
+-- your schema is left untouched. Supabase will still show a generic "destructive
+-- operations" warning because of the CREATE/ALTER/INSERT/UPDATE keywords -- that is
+-- expected; nothing here drops a table or column or deletes any rows.
 --------------------------------------------------------------------------------
+
+begin;
 
 -- 1. Folders: a batch of plants acquired/started together. Batch metadata lives
 --    here; each experiment inside a folder is just a treatment variant + timeline.
@@ -70,3 +77,5 @@ alter table public.pest_guides
 drop policy if exists "pest_guides: authenticated can update" on public.pest_guides;
 create policy "pest_guides: authenticated can update" on public.pest_guides
   for update to authenticated using (true) with check (true);
+
+commit;
