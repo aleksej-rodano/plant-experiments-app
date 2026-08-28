@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { useAuth } from './lib/hooks/useAuth'
+import CreateExperimentPage from './pages/CreateExperimentPage'
 import ExperimentDetailPage from './pages/ExperimentDetailPage'
 import ExperimentsPage from './pages/ExperimentsPage'
 import LoginPage from './pages/LoginPage'
@@ -44,6 +45,7 @@ function App() {
         <Route element={<RequireAuth />}>
           <Route element={<Layout />}>
             <Route path="/experiments" element={<ExperimentsPage />} />
+            <Route path="/experiments/new" element={<CreateExperimentPage />} />
             <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
             <Route path="/pest-control" element={<PestControlPage />} />
             <Route path="/tips" element={<TipsPage />} />

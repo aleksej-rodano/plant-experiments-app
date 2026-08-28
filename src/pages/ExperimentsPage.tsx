@@ -1,6 +1,6 @@
-import { Loader2, Plus, Sprout } from 'lucide-react'
+import { CheckCircle2, Loader2, Plus, Sprout } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import ExperimentCard from '../components/ExperimentCard'
 import { supabase } from '../lib/supabase'
 import type { Experiment } from '../types/database'
@@ -9,6 +9,19 @@ export default function ExperimentsPage() {
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [toast, setToast] = useState<string | null>(null)
+
+  useEffect(() => {
+    const state = location.state as { toast?: string } | null
+    if (!state?.toast) return
+    setToast(state.toast)
+    navigate('.', { replace: true, state: null })
+    const t = setTimeout(() => setToast(null), 3000)
+    return () => clearTimeout(t)
+  }, [location.state, navigate])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -50,6 +63,13 @@ export default function ExperimentsPage() {
           <span className="hidden sm:inline">New Experiment</span>
         </Link>
       </div>
+
+      {toast && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-secondary-container px-3 py-2 text-sm text-on-secondary-container">
+          <CheckCircle2 className="size-4 shrink-0" />
+          <span>{toast}</span>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
