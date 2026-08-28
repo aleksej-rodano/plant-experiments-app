@@ -177,6 +177,7 @@ export default function PestControlPage() {
                 <button
                   type="button"
                   aria-expanded={open}
+                  aria-controls={`pest-panel-${guide.id}`}
                   onClick={() => setExpanded(open ? null : guide.id)}
                   className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                 >
@@ -191,7 +192,10 @@ export default function PestControlPage() {
                 </button>
 
                 {open && (
-                  <div className="border-t border-outline-variant px-4 py-4">
+                  <div
+                    id={`pest-panel-${guide.id}`}
+                    className="border-t border-outline-variant px-4 py-4"
+                  >
                     <PestPhoto guide={guide} onImage={setImage} />
 
                     {guide.treatment_steps.length > 0 && (

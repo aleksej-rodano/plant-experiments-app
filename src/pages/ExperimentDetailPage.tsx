@@ -12,6 +12,18 @@ import DateLogTimeline from '../components/DateLogTimeline'
 import { supabase } from '../lib/supabase'
 import type { DateLog, Experiment, Folder } from '../types/database'
 
+function BackLink({ to, label }: { to: string; label: string }) {
+  return (
+    <Link
+      to={to}
+      className="inline-flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface"
+    >
+      <ArrowLeft className="size-4" />
+      {label}
+    </Link>
+  )
+}
+
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -113,17 +125,7 @@ export default function ExperimentDetailPage() {
     return () => clearTimeout(t)
   }, [location.state, navigate])
 
-  function BackLink() {
-    return (
-      <Link
-        to={backTo}
-        className="inline-flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface"
-      >
-        <ArrowLeft className="size-4" />
-        {folder?.title ?? (folderId ? 'Folder' : 'Folders')}
-      </Link>
-    )
-  }
+  const backLabel = folder?.title ?? (folderId ? 'Folder' : 'Folders')
 
   async function handleExport() {
     if (!experiment) return
@@ -173,7 +175,7 @@ export default function ExperimentDetailPage() {
   if (error) {
     return (
       <section className="mx-auto max-w-2xl">
-        <BackLink />
+        <BackLink to={backTo} label={backLabel} />
         <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
           <span>{error}</span>
           <button
@@ -191,7 +193,7 @@ export default function ExperimentDetailPage() {
   if (!experiment) {
     return (
       <section className="mx-auto max-w-2xl">
-        <BackLink />
+        <BackLink to={backTo} label={backLabel} />
         <p className="mt-4 rounded-lg bg-surface-container px-3 py-6 text-center text-sm text-on-surface-variant">
           Experiment not found.
         </p>
@@ -201,7 +203,7 @@ export default function ExperimentDetailPage() {
 
   return (
     <section className="mx-auto max-w-2xl">
-      <BackLink />
+      <BackLink to={backTo} label={backLabel} />
 
       {toast && (
         <div className="mt-3 flex items-center gap-2 rounded-lg bg-secondary-container px-3 py-2 text-sm text-on-secondary-container">

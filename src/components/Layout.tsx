@@ -40,7 +40,10 @@ export default function Layout() {
 
       <div className="mx-auto flex w-full max-w-5xl flex-1">
         {/* Desktop navigation rail */}
-        <nav className="hidden w-56 shrink-0 flex-col gap-1 border-r border-outline-variant p-3 md:flex">
+        <nav
+          aria-label="Primary"
+          className="hidden w-56 shrink-0 flex-col gap-1 border-r border-outline-variant p-3 md:flex"
+        >
           {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} className={({ isActive }) => navItemClass(isActive)}>
               <Icon className="size-5" />
@@ -55,7 +58,10 @@ export default function Layout() {
       </div>
 
       {/* Mobile bottom navigation */}
-      <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t border-outline-variant bg-surface md:hidden">
+      <nav
+        aria-label="Primary"
+        className="fixed inset-x-0 bottom-0 z-10 flex border-t border-outline-variant bg-surface md:hidden"
+      >
         {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}

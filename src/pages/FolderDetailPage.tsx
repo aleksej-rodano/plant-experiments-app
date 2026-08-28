@@ -179,6 +179,7 @@ export default function FolderDetailPage() {
             src={folder.cover_image_url}
             alt={folder.title}
             className="size-full object-cover"
+            loading="lazy"
           />
         ) : (
           <Sprout className="size-12 text-on-surface-variant/50" />
@@ -198,42 +199,40 @@ export default function FolderDetailPage() {
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-        {
+        <div className="rounded-lg bg-surface-container px-3 py-2">
+          <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
+            <Sprout className="size-3.5" />
+            Plants total
+          </dt>
+          <dd className="mt-0.5 text-on-surface">
+            {totalPlants}
+            <span className="text-xs text-on-surface-variant">
+              {' '}
+              across {experiments.length} experiment
+              {experiments.length === 1 ? '' : 's'}
+            </span>
+          </dd>
+        </div>
+        {folder.origin && (
           <div className="rounded-lg bg-surface-container px-3 py-2">
             <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-              <Sprout className="size-3.5" />
-              Plants total
+              <MapPin className="size-3.5" />
+              Origin
+            </dt>
+            <dd className="mt-0.5 text-on-surface">{folder.origin}</dd>
+          </div>
+        )}
+        {folder.initial_price != null && (
+          <div className="rounded-lg bg-surface-container px-3 py-2">
+            <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
+              <Tag className="size-3.5" />
+              Initial price
             </dt>
             <dd className="mt-0.5 text-on-surface">
-              {totalPlants}
-              <span className="text-xs text-on-surface-variant">
-                {' '}
-                across {experiments.length} experiment
-                {experiments.length === 1 ? '' : 's'}
-              </span>
+              ${folder.initial_price.toFixed(2)}
             </dd>
           </div>
-        }
-        {folder.origin && (
-            <div className="rounded-lg bg-surface-container px-3 py-2">
-              <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-                <MapPin className="size-3.5" />
-                Origin
-              </dt>
-              <dd className="mt-0.5 text-on-surface">{folder.origin}</dd>
-            </div>
-          )}
-          {folder.initial_price != null && (
-            <div className="rounded-lg bg-surface-container px-3 py-2">
-              <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-                <Tag className="size-3.5" />
-                Initial price
-              </dt>
-              <dd className="mt-0.5 text-on-surface">
-                ${folder.initial_price.toFixed(2)}
-              </dd>
-            </div>
-          )}
+        )}
       </dl>
 
       {folder.notes && (

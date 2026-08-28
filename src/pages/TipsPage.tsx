@@ -82,6 +82,7 @@ export default function TipsPage() {
                 <button
                   type="button"
                   aria-expanded={open}
+                  aria-controls={`tip-panel-${tip.id}`}
                   onClick={() => setExpanded(open ? null : tip.id)}
                   className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                 >
@@ -93,7 +94,10 @@ export default function TipsPage() {
                   />
                 </button>
                 {open && (
-                  <p className="whitespace-pre-wrap px-4 pb-4 text-sm text-on-surface-variant">
+                  <p
+                    id={`tip-panel-${tip.id}`}
+                    className="whitespace-pre-wrap px-4 pb-4 text-sm text-on-surface-variant"
+                  >
                     {tip.content}
                   </p>
                 )}
