@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Gradle wrapper must stay LF to run on macOS/Linux
+gradlew text eol=lf
+
+# Binaries
+*.jar   binary
+*.keystore binary
+*.png   binary
+*.jpg   binary
+*.webp  binary
+*.ico   binary

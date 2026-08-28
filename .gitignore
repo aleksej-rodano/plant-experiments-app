@@ -17,8 +17,8 @@ dist-ssr
 .env.local
 .env.*.local
 
-# Capacitor
-android/
+# Capacitor: the native android/ project IS tracked (Task 9 edits its manifest);
+# build outputs inside it are ignored by android/.gitignore.
 
 # Editor directories and files
 .vscode/*

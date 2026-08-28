@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Plant Experiments</string>
+    <string name="title_activity_main">Plant Experiments</string>
+    <string name="package_name">com.experiments.planttracker</string>
+    <string name="custom_url_scheme">com.experiments.planttracker</string>
+</resources>
