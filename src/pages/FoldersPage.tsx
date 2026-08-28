@@ -8,6 +8,7 @@ import type { Folder } from '../types/database'
 export default function FoldersPage() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [counts, setCounts] = useState<Record<string, number>>({})
+  const [plantTotals, setPlantTotals] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,18 +44,22 @@ export default function FoldersPage() {
           .abortSignal(controller.signal),
         supabase
           .from('experiments')
-          .select('folder_id')
+          .select('folder_id, plant_count')
           .abortSignal(controller.signal),
       ])
       if (foldersRes.error) throw foldersRes.error
       if (expRes.error) throw expRes.error
 
       const tally: Record<string, number> = {}
+      const plants: Record<string, number> = {}
       for (const row of expRes.data ?? []) {
         tally[row.folder_id] = (tally[row.folder_id] ?? 0) + 1
+        plants[row.folder_id] =
+          (plants[row.folder_id] ?? 0) + (row.plant_count ?? 0)
       }
       setFolders(foldersRes.data ?? [])
       setCounts(tally)
+      setPlantTotals(plants)
     } catch (e) {
       setError(
         controller.signal.aborted
@@ -151,6 +156,7 @@ export default function FoldersPage() {
               key={folder.id}
               folder={folder}
               experimentCount={counts[folder.id] ?? 0}
+              plantTotal={plantTotals[folder.id] ?? 0}
               onDelete={handleDelete}
             />
           ))}

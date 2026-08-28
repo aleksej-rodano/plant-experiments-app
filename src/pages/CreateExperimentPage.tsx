@@ -14,8 +14,11 @@ export default function CreateExperimentPage() {
   const navigate = useNavigate()
 
   const [title, setTitle] = useState('')
+  const [plantCount, setPlantCount] = useState('')
   const [notes, setNotes] = useState('')
-  const [titleError, setTitleError] = useState('')
+  const [errors, setErrors] = useState<{ title?: string; plantCount?: string }>(
+    {},
+  )
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -25,11 +28,14 @@ export default function CreateExperimentPage() {
     e.preventDefault()
     setSubmitError(null)
 
-    if (!title.trim()) {
-      setTitleError('Name is required.')
-      return
-    }
-    setTitleError('')
+    const nextErrors: { title?: string; plantCount?: string } = {}
+    if (!title.trim()) nextErrors.title = 'Name is required.'
+    const count = Number(plantCount)
+    if (!plantCount.trim()) nextErrors.plantCount = 'Plant count is required.'
+    else if (!Number.isInteger(count) || count < 1)
+      nextErrors.plantCount = 'Enter a whole number of at least 1.'
+    setErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) return
 
     if (!folderId) {
       setSubmitError('Missing folder id.')
@@ -46,6 +52,7 @@ export default function CreateExperimentPage() {
         user_id: user.id,
         folder_id: folderId,
         title: title.trim(),
+        plant_count: Number(plantCount),
         notes: notes.trim() || null,
       }
       const { error } = await supabase.from('experiments').insert(payload)
@@ -90,8 +97,24 @@ export default function CreateExperimentPage() {
             placeholder="e.g. rooting powder, smaller cuttings"
             className={inputClass}
           />
-          {titleError && (
-            <span className="text-xs text-error">{titleError}</span>
+          {errors.title && (
+            <span className="text-xs text-error">{errors.title}</span>
+          )}
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Plant count (plants in this experiment) *
+          <input
+            type="number"
+            min={1}
+            step={1}
+            inputMode="numeric"
+            value={plantCount}
+            onChange={(e) => setPlantCount(e.target.value)}
+            className={inputClass}
+          />
+          {errors.plantCount && (
+            <span className="text-xs text-error">{errors.plantCount}</span>
           )}
         </label>
 

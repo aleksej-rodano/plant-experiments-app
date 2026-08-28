@@ -6,10 +6,16 @@ import type { Folder } from '../types/database'
 interface Props {
   folder: Folder
   experimentCount?: number
+  plantTotal?: number
   onDelete: (id: string) => Promise<void>
 }
 
-export default function FolderCard({ folder, experimentCount, onDelete }: Props) {
+export default function FolderCard({
+  folder,
+  experimentCount,
+  plantTotal,
+  onDelete,
+}: Props) {
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -49,6 +55,7 @@ export default function FolderCard({ folder, experimentCount, onDelete }: Props)
           {experimentCount != null && (
             <p className="text-sm text-on-surface-variant">
               {experimentCount} experiment{experimentCount === 1 ? '' : 's'}
+              {plantTotal != null && ` · ${plantTotal} plant${plantTotal === 1 ? '' : 's'}`}
             </p>
           )}
           {folder.origin && (

@@ -21,7 +21,8 @@ export default function TipsPage() {
         .order('created_at', { ascending: true })
         .abortSignal(controller.signal)
       if (error) throw error
-      setTips(data ?? [])
+      // "Hydrogen Peroxide Dilution" is covered by the Pest Control protocols now.
+      setTips((data ?? []).filter((t) => t.title !== 'Hydrogen Peroxide Dilution'))
     } catch (e) {
       setError(
         controller.signal.aborted

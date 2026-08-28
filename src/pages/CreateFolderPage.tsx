@@ -14,7 +14,6 @@ export default function CreateFolderPage() {
   const navigate = useNavigate()
 
   const [title, setTitle] = useState('')
-  const [plantCount, setPlantCount] = useState('')
   const [origin, setOrigin] = useState('')
   const [initialPrice, setInitialPrice] = useState('')
   const [notes, setNotes] = useState('')
@@ -55,11 +54,6 @@ export default function CreateFolderPage() {
   function validate() {
     const next: Record<string, string> = {}
     if (!title.trim()) next.title = 'Title is required.'
-    if (plantCount.trim()) {
-      const count = Number(plantCount)
-      if (!Number.isInteger(count) || count < 1)
-        next.plantCount = 'Enter a whole number of at least 1.'
-    }
     if (initialPrice.trim() && Number(initialPrice) < 0)
       next.initialPrice = 'Price cannot be negative.'
     setErrors(next)
@@ -81,7 +75,6 @@ export default function CreateFolderPage() {
       const payload: Database['public']['Tables']['folders']['Insert'] = {
         user_id: user.id,
         title: title.trim(),
-        plant_count: plantCount.trim() ? Number(plantCount) : null,
         origin: origin.trim() || null,
         initial_price: initialPrice.trim() ? Number(initialPrice) : null,
         notes: notes.trim() || null,
@@ -137,21 +130,10 @@ export default function CreateFolderPage() {
           )}
         </label>
 
-        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Plant count
-          <input
-            type="number"
-            min={1}
-            step={1}
-            inputMode="numeric"
-            value={plantCount}
-            onChange={(e) => setPlantCount(e.target.value)}
-            className={inputClass}
-          />
-          {errors.plantCount && (
-            <span className="text-xs text-error">{errors.plantCount}</span>
-          )}
-        </label>
+        <p className="text-xs text-on-surface-variant">
+          Total plant count is added up from the experiments you put in this
+          folder.
+        </p>
 
         <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
           Origin (where purchased)

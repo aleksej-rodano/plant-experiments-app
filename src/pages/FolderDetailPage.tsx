@@ -45,6 +45,11 @@ export default function FolderDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  const totalPlants = experiments.reduce(
+    (sum, e) => sum + (e.plant_count ?? 0),
+    0,
+  )
+
   const load = useCallback(
     async (opts?: { background?: boolean }) => {
       if (!folderId) return
@@ -192,20 +197,24 @@ export default function FolderDetailPage() {
         </Link>
       </div>
 
-      {(folder.plant_count != null ||
-        folder.origin ||
-        folder.initial_price != null) && (
-        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-          {folder.plant_count != null && (
-            <div className="rounded-lg bg-surface-container px-3 py-2">
-              <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-                <Sprout className="size-3.5" />
-                Plants
-              </dt>
-              <dd className="mt-0.5 text-on-surface">{folder.plant_count}</dd>
-            </div>
-          )}
-          {folder.origin && (
+      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+        {
+          <div className="rounded-lg bg-surface-container px-3 py-2">
+            <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
+              <Sprout className="size-3.5" />
+              Plants total
+            </dt>
+            <dd className="mt-0.5 text-on-surface">
+              {totalPlants}
+              <span className="text-xs text-on-surface-variant">
+                {' '}
+                across {experiments.length} experiment
+                {experiments.length === 1 ? '' : 's'}
+              </span>
+            </dd>
+          </div>
+        }
+        {folder.origin && (
             <div className="rounded-lg bg-surface-container px-3 py-2">
               <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
                 <MapPin className="size-3.5" />
@@ -225,8 +234,7 @@ export default function FolderDetailPage() {
               </dd>
             </div>
           )}
-        </dl>
-      )}
+      </dl>
 
       {folder.notes && (
         <p className="mt-3 whitespace-pre-wrap rounded-lg bg-surface-container px-3 py-2 text-sm text-on-surface">
@@ -263,11 +271,11 @@ export default function FolderDetailPage() {
                   <span className="block truncate font-medium text-on-surface">
                     {exp.title}
                   </span>
-                  {exp.notes && (
-                    <span className="block truncate text-sm text-on-surface-variant">
-                      {exp.notes}
-                    </span>
-                  )}
+                  <span className="block truncate text-sm text-on-surface-variant">
+                    {exp.plant_count ?? 0} plant
+                    {(exp.plant_count ?? 0) === 1 ? '' : 's'}
+                    {exp.notes ? ` · ${exp.notes}` : ''}
+                  </span>
                 </span>
                 <ChevronRight className="size-4 shrink-0 text-on-surface-variant" />
               </Link>
