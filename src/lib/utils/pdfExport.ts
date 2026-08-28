@@ -58,7 +58,10 @@ function waitForImages(node: HTMLElement) {
 
 function makeBlock(html: string) {
   const block = document.createElement('div')
-  block.style.cssText = 'width:100%;box-sizing:border-box'
+  // Generous line-height + padding: html2canvas otherwise clips the top/bottom
+  // of glyphs when text sits flush against the element box.
+  block.style.cssText =
+    'width:100%;box-sizing:border-box;padding:4px 6px 12px;line-height:1.7;overflow-wrap:anywhere;word-break:break-word'
   block.innerHTML = html
   return block
 }
@@ -71,7 +74,7 @@ function makeBlock(html: string) {
 function buildTemplate(experiment: Experiment, dateLogs: DateLog[]) {
   const container = document.createElement('div')
   container.style.cssText = [
-    'position:fixed',
+    'position:absolute',
     'left:-10000px',
     'top:0',
     `width:${TEMPLATE_WIDTH}px`,
@@ -80,7 +83,7 @@ function buildTemplate(experiment: Experiment, dateLogs: DateLog[]) {
     'color:#1a1c19',
     "font-family:'Roboto',system-ui,'Segoe UI',sans-serif",
     'font-size:14px',
-    'line-height:1.5',
+    'line-height:1.7',
   ].join(';')
 
   const blocks: HTMLElement[] = []
@@ -95,11 +98,15 @@ function buildTemplate(experiment: Experiment, dateLogs: DateLog[]) {
   )
 
   if (experiment.cover_image_url) {
+    // Centered, natural aspect ratio (no horizontal stretch), capped to a
+    // compact near-square footprint.
     blocks.push(
       makeBlock(
-        `<img src="${esc(
-          experiment.cover_image_url,
-        )}" style="width:100%;max-height:320px;object-fit:cover;border-radius:12px" />`,
+        `<div style="text-align:center">
+          <img src="${esc(
+            experiment.cover_image_url,
+          )}" style="max-width:340px;max-height:340px;width:auto;height:auto;border-radius:12px" />
+        </div>`,
       ),
     )
   }
@@ -200,6 +207,9 @@ export async function exportExperimentToPDF(
   document.body.appendChild(container)
 
   try {
+    // Fonts must be ready before rasterising, or html2canvas measures glyphs
+    // with fallback metrics and clips the text.
+    if (document.fonts?.ready) await document.fonts.ready
     await waitForImages(container)
 
     const doc = new jsPDF('p', 'mm', 'a4')
