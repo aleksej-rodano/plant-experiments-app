@@ -1,10 +1,97 @@
-import { Bug, ChevronDown, Loader2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Bug, ChevronDown, ImagePlus, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import PestTreatmentGuide, {
   hasPestProtocol,
 } from '../components/PestTreatmentGuide'
+import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { uploadImage, validateImage } from '../lib/utils/image'
 import type { PestGuide } from '../types/database'
+
+function PestPhoto({
+  guide,
+  onImage,
+}: {
+  guide: PestGuide
+  onImage: (id: string, url: string) => void
+}) {
+  const { user } = useAuth()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function pick(file: File | undefined) {
+    if (!file || !user) return
+    const problem = validateImage(file)
+    if (problem) {
+      setError(problem)
+      return
+    }
+    setError(null)
+    setBusy(true)
+    try {
+      const url = await uploadImage(file, user.id)
+      const { error } = await supabase
+        .from('pest_guides')
+        .update({ image_url: url })
+        .eq('id', guide.id)
+      if (error) throw error
+      onImage(guide.id, url)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed.')
+    } finally {
+      setBusy(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="mb-5">
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        className="hidden"
+        onChange={(e) => void pick(e.target.files?.[0])}
+      />
+      {guide.image_url ? (
+        <figure>
+          <img
+            src={guide.image_url}
+            alt={`${guide.pest_name} reference photo`}
+            className="w-full rounded-lg object-cover ring-1 ring-outline-variant"
+            loading="lazy"
+          />
+          <figcaption className="mt-1.5">
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={busy}
+              className="text-xs font-medium text-on-surface-variant underline hover:text-on-surface disabled:opacity-60"
+            >
+              {busy ? 'Replacing…' : 'Replace photo'}
+            </button>
+          </figcaption>
+        </figure>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={busy}
+          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant disabled:opacity-60"
+        >
+          {busy ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <ImagePlus className="size-5" />
+          )}
+          {busy ? 'Uploading…' : 'Add reference photo'}
+        </button>
+      )}
+      {error && <p className="mt-1 text-xs text-error">{error}</p>}
+    </div>
+  )
+}
 
 export default function PestControlPage() {
   const [guides, setGuides] = useState<PestGuide[]>([])
@@ -42,6 +129,12 @@ export default function PestControlPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  function setImage(id: string, url: string) {
+    setGuides((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, image_url: url } : g)),
+    )
+  }
 
   return (
     <section>
@@ -87,7 +180,7 @@ export default function PestControlPage() {
                   onClick={() => setExpanded(open ? null : guide.id)}
                   className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
                 >
-                  <span className="font-medium text-on-surface">
+                  <span className="font-semibold text-primary">
                     {guide.pest_name}
                   </span>
                   <ChevronDown
@@ -99,6 +192,8 @@ export default function PestControlPage() {
 
                 {open && (
                   <div className="border-t border-outline-variant px-4 py-4">
+                    <PestPhoto guide={guide} onImage={setImage} />
+
                     {guide.treatment_steps.length > 0 && (
                       <>
                         <h3 className="mb-2 text-sm font-medium text-on-surface-variant">

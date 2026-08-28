@@ -1,6 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import type { DateLog, Experiment } from '../../types/database'
+import type { DateLog, Experiment, Folder } from '../../types/database'
 
 /** A4 at ~96dpi, in CSS px — the render width of the hidden template. */
 const TEMPLATE_WIDTH = 794
@@ -71,7 +71,17 @@ function makeBlock(html: string) {
  * is rasterised separately so the PDF can page-break *between* blocks instead of
  * slicing through text or an image.
  */
-function buildTemplate(experiment: Experiment, dateLogs: DateLog[]) {
+function buildTemplate(
+  experiment: Experiment,
+  dateLogs: DateLog[],
+  folder?: Folder | null,
+) {
+  // Batch facts live on the folder now; fall back to any legacy values still on
+  // the experiment row.
+  const plantCount = folder?.plant_count ?? experiment.plant_count
+  const origin = folder?.origin ?? experiment.origin
+  const initialPrice = folder?.initial_price ?? experiment.initial_price
+  const coverUrl = folder?.cover_image_url ?? experiment.cover_image_url
   const container = document.createElement('div')
   container.style.cssText = [
     'position:absolute',
@@ -93,32 +103,34 @@ function buildTemplate(experiment: Experiment, dateLogs: DateLog[]) {
       `<h1 style="margin:0 0 4px;font-size:26px;font-weight:500">${esc(
         experiment.title,
       )}</h1>
-       <div style="color:#424940;font-size:13px">Plant experiment history</div>`,
+       <div style="color:#424940;font-size:13px">${
+         folder ? `${esc(folder.title)} — ` : ''
+       }plant experiment history</div>`,
     ),
   )
 
-  if (experiment.cover_image_url) {
+  if (coverUrl) {
     // Centered, natural aspect ratio (no horizontal stretch), capped to a
     // compact near-square footprint.
     blocks.push(
       makeBlock(
         `<div style="text-align:center">
           <img src="${esc(
-            experiment.cover_image_url,
+            coverUrl,
           )}" style="max-width:340px;max-height:340px;width:auto;height:auto;border-radius:12px" />
         </div>`,
       ),
     )
   }
 
-  const facts: string[] = [
-    `<strong>Plants:</strong> ${esc(String(experiment.plant_count))}`,
-    `<strong>Origin:</strong> ${esc(experiment.origin)}`,
-  ]
-  if (experiment.initial_price != null) {
-    facts.push(
-      `<strong>Initial price:</strong> $${experiment.initial_price.toFixed(2)}`,
-    )
+  const facts: string[] = []
+  if (folder) facts.push(`<strong>Folder:</strong> ${esc(folder.title)}`)
+  if (plantCount != null) {
+    facts.push(`<strong>Plants:</strong> ${esc(String(plantCount))}`)
+  }
+  if (origin) facts.push(`<strong>Origin:</strong> ${esc(origin)}`)
+  if (initialPrice != null) {
+    facts.push(`<strong>Initial price:</strong> $${initialPrice.toFixed(2)}`)
   }
   facts.push(`<strong>Created:</strong> ${formatDate(experiment.created_at)}`)
   blocks.push(
@@ -196,6 +208,7 @@ async function renderBlock(block: HTMLElement, contentW: number) {
 export async function exportExperimentToPDF(
   experiment: Experiment,
   dateLogs: DateLog[],
+  folder?: Folder | null,
 ) {
   // Logs oldest-first for a chronological read.
   const ordered = [...dateLogs].sort((a, b) => {
@@ -203,7 +216,7 @@ export async function exportExperimentToPDF(
     return a.created_at < b.created_at ? -1 : 1
   })
 
-  const { container, blocks } = buildTemplate(experiment, ordered)
+  const { container, blocks } = buildTemplate(experiment, ordered, folder)
   document.body.appendChild(container)
 
   try {

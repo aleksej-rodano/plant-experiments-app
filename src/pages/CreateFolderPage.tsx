@@ -1,30 +1,23 @@
 import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
-import type { Experiment, Folder } from '../types/database'
+import type { Database } from '../types/database'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
 
-const today = () => new Date().toISOString().slice(0, 10)
-
-export default function AddDateLogPage() {
-  const { id } = useParams<{ id: string }>()
+export default function CreateFolderPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
-  const navState = location.state as {
-    experiment?: Experiment
-    folder?: Folder
-  } | null
-  const experiment = navState?.experiment
-  const folder = navState?.folder
 
-  const [logDate, setLogDate] = useState(today)
-  const [statusDetails, setStatusDetails] = useState('')
+  const [title, setTitle] = useState('')
+  const [plantCount, setPlantCount] = useState('')
+  const [origin, setOrigin] = useState('')
+  const [initialPrice, setInitialPrice] = useState('')
+  const [notes, setNotes] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -59,48 +52,55 @@ export default function AddDateLogPage() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
+  function validate() {
+    const next: Record<string, string> = {}
+    if (!title.trim()) next.title = 'Title is required.'
+    if (plantCount.trim()) {
+      const count = Number(plantCount)
+      if (!Number.isInteger(count) || count < 1)
+        next.plantCount = 'Enter a whole number of at least 1.'
+    }
+    if (initialPrice.trim() && Number(initialPrice) < 0)
+      next.initialPrice = 'Price cannot be negative.'
+    setErrors(next)
+    return Object.keys(next).length === 0
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setSubmitError(null)
-
-    const next: Record<string, string> = {}
-    if (!statusDetails.trim()) next.statusDetails = 'Status details are required.'
-    if (!logDate) next.logDate = 'Pick a date.'
-    setErrors((prev) => ({ ...prev, ...next }))
-    if (Object.keys(next).length > 0) return
-
-    if (!id) {
-      setSubmitError('Missing experiment id.')
-      return
-    }
     if (!user) {
-      setSubmitError('You must be signed in.')
+      setSubmitError('You must be signed in to create a folder.')
       return
     }
+    if (!validate()) return
 
     setBusy(true)
     try {
-      const imageUrl = image ? await uploadImage(image, user.id) : null
-      // One round trip: insert and read the row back, then hand both the
-      // experiment (from route state) and the new log to the detail page so
-      // it renders with zero further requests.
+      const coverUrl = image ? await uploadImage(image, user.id) : ''
+      const payload: Database['public']['Tables']['folders']['Insert'] = {
+        user_id: user.id,
+        title: title.trim(),
+        plant_count: plantCount.trim() ? Number(plantCount) : null,
+        origin: origin.trim() || null,
+        initial_price: initialPrice.trim() ? Number(initialPrice) : null,
+        notes: notes.trim() || null,
+        cover_image_url: coverUrl || null,
+      }
       const { data, error } = await supabase
-        .from('date_logs')
-        .insert({
-          experiment_id: id,
-          log_date: logDate,
-          status_details: statusDetails.trim(),
-          image_url: imageUrl,
-        })
-        .select()
+        .from('folders')
+        .insert(payload)
+        .select('id')
         .single()
       if (error) throw error
-      navigate(`/experiments/${id}`, {
+      navigate(`/folders/${data.id}`, {
         replace: true,
-        state: { toast: 'Log entry added.', experiment, folder, newLog: data },
+        state: { toast: 'Folder created. Add your first experiment.' },
       })
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Could not save log entry.')
+      setSubmitError(
+        err instanceof Error ? err.message : 'Could not save folder.',
+      )
       setBusy(false)
     }
   }
@@ -109,43 +109,88 @@ export default function AddDateLogPage() {
     <section className="mx-auto max-w-lg">
       <div className="mb-4 flex items-center gap-2">
         <Link
-          to={id ? `/experiments/${id}` : '/experiments'}
+          to="/experiments"
           className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-variant"
-          aria-label="Back to experiment"
+          aria-label="Back to folders"
         >
           <ArrowLeft className="size-5" />
         </Link>
-        <h1 className="text-xl font-medium text-on-surface">Add Log Entry</h1>
+        <h1 className="text-xl font-medium text-on-surface">New Folder</h1>
       </div>
+
+      <p className="mb-4 rounded-lg bg-surface-container px-3 py-2 text-sm text-on-surface-variant">
+        A folder describes one batch of plants (where they came from, how many,
+        what you paid). You then add the experiments you run on that batch.
+      </p>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Date *
+          Title (plant species / batch name) *
           <input
-            type="date"
-            value={logDate}
-            max={today()}
-            onChange={(e) => setLogDate(e.target.value)}
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             className={inputClass}
           />
-          {errors.logDate && <span className="text-xs text-error">{errors.logDate}</span>}
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Status details *
-          <textarea
-            rows={4}
-            value={statusDetails}
-            onChange={(e) => setStatusDetails(e.target.value)}
-            className={inputClass}
-          />
-          {errors.statusDetails && (
-            <span className="text-xs text-error">{errors.statusDetails}</span>
+          {errors.title && (
+            <span className="text-xs text-error">{errors.title}</span>
           )}
         </label>
 
+        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Plant count
+          <input
+            type="number"
+            min={1}
+            step={1}
+            inputMode="numeric"
+            value={plantCount}
+            onChange={(e) => setPlantCount(e.target.value)}
+            className={inputClass}
+          />
+          {errors.plantCount && (
+            <span className="text-xs text-error">{errors.plantCount}</span>
+          )}
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Origin (where purchased)
+          <input
+            type="text"
+            value={origin}
+            onChange={(e) => setOrigin(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Initial price
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            inputMode="decimal"
+            value={initialPrice}
+            onChange={(e) => setInitialPrice(e.target.value)}
+            className={inputClass}
+          />
+          {errors.initialPrice && (
+            <span className="text-xs text-error">{errors.initialPrice}</span>
+          )}
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Notes
+          <textarea
+            rows={3}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+
         <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Photo
+          Cover image
           <input
             ref={fileRef}
             type="file"
@@ -157,13 +202,13 @@ export default function AddDateLogPage() {
             <div className="relative overflow-hidden rounded-lg ring-1 ring-outline-variant">
               <img
                 src={previewUrl}
-                alt="Photo preview"
+                alt="Cover preview"
                 className="aspect-video w-full object-cover"
               />
               <button
                 type="button"
                 onClick={clearImage}
-                aria-label="Remove photo"
+                aria-label="Remove image"
                 className="absolute right-2 top-2 rounded-lg bg-surface/80 p-1.5 text-on-surface-variant backdrop-blur hover:bg-surface hover:text-error"
               >
                 <X className="size-4" />
@@ -179,7 +224,9 @@ export default function AddDateLogPage() {
               Choose JPG or PNG
             </button>
           )}
-          {errors.image && <span className="text-xs text-error">{errors.image}</span>}
+          {errors.image && (
+            <span className="text-xs text-error">{errors.image}</span>
+          )}
         </div>
 
         {submitError && (
@@ -190,7 +237,7 @@ export default function AddDateLogPage() {
 
         <div className="flex gap-3">
           <Link
-            to={id ? `/experiments/${id}` : '/experiments'}
+            to="/experiments"
             className="flex-1 rounded-lg px-4 py-2.5 text-center text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
           >
             Cancel
@@ -201,7 +248,7 @@ export default function AddDateLogPage() {
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary disabled:opacity-60"
           >
             {busy && <Loader2 className="size-4 animate-spin" />}
-            {busy ? (image ? 'Uploading photo…' : 'Saving…') : 'Save entry'}
+            {busy ? (image ? 'Uploading photo…' : 'Saving…') : 'Save folder'}
           </button>
         </div>
       </form>

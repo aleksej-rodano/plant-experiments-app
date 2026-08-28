@@ -3,39 +3,28 @@ import {
   CheckCircle2,
   FileDown,
   Loader2,
-  MapPin,
   Plus,
-  Sprout,
-  Tag,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DateLogTimeline from '../components/DateLogTimeline'
 import { supabase } from '../lib/supabase'
-import type { DateLog, Experiment } from '../types/database'
-
-function BackLink() {
-  return (
-    <Link
-      to="/experiments"
-      className="inline-flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface"
-    >
-      <ArrowLeft className="size-4" />
-      Experiments
-    </Link>
-  )
-}
+import type { DateLog, Experiment, Folder } from '../types/database'
 
 export default function ExperimentDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Data handed over from the "Add Log Entry" flow, captured once on mount so it
-  // survives the state-clearing navigation in the toast effect below.
+  // Data handed over from the folder view or the "Add Log Entry" flow, captured
+  // once on mount so it survives the state-clearing navigation in the toast effect.
   const handoff = useRef(
-    (location.state as { experiment?: Experiment; newLog?: DateLog } | null) ?? {},
+    (location.state as {
+      experiment?: Experiment
+      folder?: Folder
+      newLog?: DateLog
+    } | null) ?? {},
   )
   const seededExperiment = handoff.current.experiment
   const seedLogs = handoff.current.newLog ? [handoff.current.newLog] : undefined
@@ -43,12 +32,18 @@ export default function ExperimentDetailPage() {
   const [experiment, setExperiment] = useState<Experiment | null>(
     seededExperiment ?? null,
   )
+  const [folder, setFolder] = useState<Folder | null>(
+    handoff.current.folder ?? null,
+  )
   const [loading, setLoading] = useState(!seededExperiment)
   const [error, setError] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
+
+  const folderId = experiment?.folder_id ?? folder?.id ?? null
+  const backTo = folderId ? `/folders/${folderId}` : '/experiments'
 
   const load = useCallback(
     async (opts?: { background?: boolean }) => {
@@ -87,10 +82,27 @@ export default function ExperimentDetailPage() {
   )
 
   useEffect(() => {
-    // When the row was handed over from the list (or the add-log flow) render it
-    // immediately and only refresh in the background — no blocking spinner.
     void load({ background: Boolean(seededExperiment) })
   }, [load, seededExperiment])
+
+  // Pull the parent folder in if we weren't handed it (needed for the PDF facts
+  // and the back link label).
+  useEffect(() => {
+    const fid = experiment?.folder_id
+    if (!fid || folder?.id === fid) return
+    let cancelled = false
+    void (async () => {
+      const { data } = await supabase
+        .from('folders')
+        .select()
+        .eq('id', fid)
+        .maybeSingle()
+      if (!cancelled && data) setFolder(data)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [experiment?.folder_id, folder?.id])
 
   useEffect(() => {
     const state = location.state as { toast?: string } | null
@@ -100,6 +112,18 @@ export default function ExperimentDetailPage() {
     const t = setTimeout(() => setToast(null), 3000)
     return () => clearTimeout(t)
   }, [location.state, navigate])
+
+  function BackLink() {
+    return (
+      <Link
+        to={backTo}
+        className="inline-flex items-center gap-1.5 text-sm text-on-surface-variant hover:text-on-surface"
+      >
+        <ArrowLeft className="size-4" />
+        {folder?.title ?? (folderId ? 'Folder' : 'Folders')}
+      </Link>
+    )
+  }
 
   async function handleExport() {
     if (!experiment) return
@@ -115,7 +139,7 @@ export default function ExperimentDetailPage() {
       if (error) throw new Error(error.message)
       // Lazy-loaded: keeps jspdf + html2canvas (~1 MB) out of the initial bundle.
       const { exportExperimentToPDF } = await import('../lib/utils/pdfExport')
-      await exportExperimentToPDF(experiment, data ?? [])
+      await exportExperimentToPDF(experiment, data ?? [], folder)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'PDF export failed.')
     } finally {
@@ -132,7 +156,7 @@ export default function ExperimentDetailPage() {
       setDeleting(false)
       return
     }
-    navigate('/experiments', {
+    navigate(backTo, {
       replace: true,
       state: { toast: 'Experiment deleted.' },
     })
@@ -186,20 +210,15 @@ export default function ExperimentDetailPage() {
         </div>
       )}
 
-      <div className="mt-3 flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-surface-variant">
-        {experiment.cover_image_url ? (
-          <img
-            src={experiment.cover_image_url}
-            alt={experiment.title}
-            className="size-full object-cover"
-          />
-        ) : (
-          <Sprout className="size-12 text-on-surface-variant/50" />
-        )}
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-2xl font-medium text-on-surface">{experiment.title}</h1>
+      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          {folder && (
+            <p className="text-sm text-on-surface-variant">{folder.title}</p>
+          )}
+          <h1 className="text-2xl font-medium text-on-surface">
+            {experiment.title}
+          </h1>
+        </div>
         <div className="flex gap-2">
           <button
             type="button"
@@ -218,7 +237,7 @@ export default function ExperimentDetailPage() {
           </button>
           <Link
             to={`/experiments/${experiment.id}/logs/new`}
-            state={{ experiment }}
+            state={{ experiment, folder }}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
           >
             <Plus className="size-4" />
@@ -226,34 +245,6 @@ export default function ExperimentDetailPage() {
           </Link>
         </div>
       </div>
-
-      <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-        <div className="rounded-lg bg-surface-container px-3 py-2">
-          <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-            <Sprout className="size-3.5" />
-            Plants
-          </dt>
-          <dd className="mt-0.5 text-on-surface">{experiment.plant_count}</dd>
-        </div>
-        <div className="rounded-lg bg-surface-container px-3 py-2">
-          <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-            <MapPin className="size-3.5" />
-            Origin
-          </dt>
-          <dd className="mt-0.5 text-on-surface">{experiment.origin}</dd>
-        </div>
-        {experiment.initial_price != null && (
-          <div className="rounded-lg bg-surface-container px-3 py-2">
-            <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
-              <Tag className="size-3.5" />
-              Initial price
-            </dt>
-            <dd className="mt-0.5 text-on-surface">
-              ${experiment.initial_price.toFixed(2)}
-            </dd>
-          </div>
-        )}
-      </dl>
 
       {experiment.notes && (
         <p className="mt-3 whitespace-pre-wrap rounded-lg bg-surface-container px-3 py-2 text-sm text-on-surface">

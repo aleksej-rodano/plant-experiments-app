@@ -1,12 +1,13 @@
-import { CheckCircle2, Loader2, Plus, Sprout } from 'lucide-react'
+import { CheckCircle2, FolderPlus, Layers, Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import ExperimentCard from '../components/ExperimentCard'
+import FolderCard from '../components/FolderCard'
 import { supabase } from '../lib/supabase'
-import type { Experiment } from '../types/database'
+import type { Folder } from '../types/database'
 
-export default function ExperimentsPage() {
-  const [experiments, setExperiments] = useState<Experiment[]>([])
+export default function FoldersPage() {
+  const [folders, setFolders] = useState<Folder[]>([])
+  const [counts, setCounts] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(true)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,20 +35,33 @@ export default function ExperimentsPage() {
     const abortTimer = setTimeout(() => controller.abort(), 15000)
 
     try {
-      const { data, error } = await supabase
-        .from('experiments')
-        .select()
-        .order('created_at', { ascending: false })
-        .abortSignal(controller.signal)
-      if (error) throw error
-      setExperiments(data ?? [])
+      const [foldersRes, expRes] = await Promise.all([
+        supabase
+          .from('folders')
+          .select()
+          .order('created_at', { ascending: false })
+          .abortSignal(controller.signal),
+        supabase
+          .from('experiments')
+          .select('folder_id')
+          .abortSignal(controller.signal),
+      ])
+      if (foldersRes.error) throw foldersRes.error
+      if (expRes.error) throw expRes.error
+
+      const tally: Record<string, number> = {}
+      for (const row of expRes.data ?? []) {
+        tally[row.folder_id] = (tally[row.folder_id] ?? 0) + 1
+      }
+      setFolders(foldersRes.data ?? [])
+      setCounts(tally)
     } catch (e) {
       setError(
         controller.signal.aborted
           ? 'The server took too long to respond. Check your connection and retry.'
           : e instanceof Error
             ? e.message
-            : 'Failed to load experiments.',
+            : 'Failed to load folders.',
       )
     } finally {
       clearTimeout(slowTimer)
@@ -62,27 +76,27 @@ export default function ExperimentsPage() {
   }, [load])
 
   async function handleDelete(id: string) {
-    const { error } = await supabase.from('experiments').delete().eq('id', id)
+    const { error } = await supabase.from('folders').delete().eq('id', id)
     if (error) {
       setError(error.message)
       return
     }
-    setExperiments((prev) => prev.filter((e) => e.id !== id))
+    setFolders((prev) => prev.filter((f) => f.id !== id))
   }
 
   return (
     <section>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-xl font-medium text-on-surface">
-          <Sprout className="size-6 text-primary" />
-          Experiments
+          <Layers className="size-6 text-primary" />
+          Experiment Folders
         </h1>
         <Link
-          to="/experiments/new"
+          to="/folders/new"
           className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
         >
-          <Plus className="size-4" />
-          <span className="hidden sm:inline">New Experiment</span>
+          <FolderPlus className="size-4" />
+          <span className="hidden sm:inline">New Folder</span>
         </Link>
       </div>
 
@@ -115,27 +129,28 @@ export default function ExperimentsPage() {
             </p>
           )}
         </div>
-      ) : experiments.length === 0 && !error ? (
+      ) : folders.length === 0 && !error ? (
         <div className="rounded-lg bg-surface-container px-4 py-16 text-center">
-          <Sprout className="mx-auto mb-3 size-10 text-on-surface-variant/50" />
-          <p className="text-on-surface">No experiments yet.</p>
+          <Layers className="mx-auto mb-3 size-10 text-on-surface-variant/50" />
+          <p className="text-on-surface">No folders yet.</p>
           <p className="mt-1 text-sm text-on-surface-variant">
-            Create your first experiment to start tracking.
+            A folder holds one batch of plants and the experiments you run on it.
           </p>
           <Link
-            to="/experiments/new"
+            to="/folders/new"
             className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:opacity-90"
           >
-            <Plus className="size-4" />
-            New Experiment
+            <FolderPlus className="size-4" />
+            New Folder
           </Link>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {experiments.map((experiment) => (
-            <ExperimentCard
-              key={experiment.id}
-              experiment={experiment}
+          {folders.map((folder) => (
+            <FolderCard
+              key={folder.id}
+              folder={folder}
+              experimentCount={counts[folder.id] ?? 0}
               onDelete={handleDelete}
             />
           ))}

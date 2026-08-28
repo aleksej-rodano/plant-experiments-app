@@ -4,8 +4,10 @@ import Layout from './components/Layout'
 import { useAuth } from './lib/hooks/useAuth'
 import AddDateLogPage from './pages/AddDateLogPage'
 import CreateExperimentPage from './pages/CreateExperimentPage'
+import CreateFolderPage from './pages/CreateFolderPage'
 import ExperimentDetailPage from './pages/ExperimentDetailPage'
-import ExperimentsPage from './pages/ExperimentsPage'
+import FolderDetailPage from './pages/FolderDetailPage'
+import FoldersPage from './pages/FoldersPage'
 import LoginPage from './pages/LoginPage'
 import PestControlPage from './pages/PestControlPage'
 import TipsPage from './pages/TipsPage'
@@ -47,8 +49,13 @@ function App() {
 
         <Route element={<RequireAuth />}>
           <Route element={<Layout />}>
-            <Route path="/experiments" element={<ExperimentsPage />} />
-            <Route path="/experiments/new" element={<CreateExperimentPage />} />
+            <Route path="/experiments" element={<FoldersPage />} />
+            <Route path="/folders/new" element={<CreateFolderPage />} />
+            <Route path="/folders/:folderId" element={<FolderDetailPage />} />
+            <Route
+              path="/folders/:folderId/experiments/new"
+              element={<CreateExperimentPage />}
+            />
             <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
             <Route
               path="/experiments/:id/logs/new"

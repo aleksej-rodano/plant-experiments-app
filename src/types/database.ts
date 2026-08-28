@@ -4,13 +4,13 @@
 export interface Database {
   public: {
     Tables: {
-      experiments: {
+      folders: {
         Row: {
           id: string
           user_id: string
           title: string
-          plant_count: number
-          origin: string
+          plant_count: number | null
+          origin: string | null
           initial_price: number | null
           notes: string | null
           cover_image_url: string | null
@@ -21,8 +21,38 @@ export interface Database {
           id?: string
           user_id?: string
           title: string
-          plant_count: number
-          origin: string
+          plant_count?: number | null
+          origin?: string | null
+          initial_price?: number | null
+          notes?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['folders']['Insert']>
+        Relationships: []
+      }
+      experiments: {
+        Row: {
+          id: string
+          user_id: string
+          folder_id: string
+          title: string
+          plant_count: number | null
+          origin: string | null
+          initial_price: number | null
+          notes: string | null
+          cover_image_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          folder_id: string
+          title: string
+          plant_count?: number | null
+          origin?: string | null
           initial_price?: number | null
           notes?: string | null
           cover_image_url?: string | null
@@ -59,12 +89,14 @@ export interface Database {
           id: string
           pest_name: string
           treatment_steps: string[]
+          image_url: string | null
           created_at: string
         }
         Insert: {
           id?: string
           pest_name: string
           treatment_steps: string[]
+          image_url?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['pest_guides']['Insert']>
@@ -94,6 +126,7 @@ export interface Database {
   }
 }
 
+export type Folder = Database['public']['Tables']['folders']['Row']
 export type Experiment = Database['public']['Tables']['experiments']['Row']
 export type DateLog = Database['public']['Tables']['date_logs']['Row']
 export type PestGuide = Database['public']['Tables']['pest_guides']['Row']
