@@ -1,23 +1,22 @@
 import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
-import type { Database } from '../types/database'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
 
-export default function CreateExperimentPage() {
+const today = () => new Date().toISOString().slice(0, 10)
+
+export default function AddDateLogPage() {
+  const { id } = useParams<{ id: string }>()
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  const [title, setTitle] = useState('')
-  const [plantCount, setPlantCount] = useState('')
-  const [origin, setOrigin] = useState('')
-  const [initialPrice, setInitialPrice] = useState('')
-  const [notes, setNotes] = useState('')
+  const [logDate, setLogDate] = useState(today)
+  const [statusDetails, setStatusDetails] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -52,49 +51,41 @@ export default function CreateExperimentPage() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  function validate() {
-    const next: Record<string, string> = {}
-    if (!title.trim()) next.title = 'Title is required.'
-    const count = Number(plantCount)
-    if (!plantCount.trim()) next.plantCount = 'Plant count is required.'
-    else if (!Number.isInteger(count) || count < 1)
-      next.plantCount = 'Enter a whole number of at least 1.'
-    if (!origin.trim()) next.origin = 'Origin is required.'
-    if (initialPrice.trim() && Number(initialPrice) < 0)
-      next.initialPrice = 'Price cannot be negative.'
-    setErrors(next)
-    return Object.keys(next).length === 0
-  }
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setSubmitError(null)
-    if (!user) {
-      setSubmitError('You must be signed in to create an experiment.')
+
+    const next: Record<string, string> = {}
+    if (!statusDetails.trim()) next.statusDetails = 'Status details are required.'
+    if (!logDate) next.logDate = 'Pick a date.'
+    setErrors((prev) => ({ ...prev, ...next }))
+    if (Object.keys(next).length > 0) return
+
+    if (!id) {
+      setSubmitError('Missing experiment id.')
       return
     }
-    if (!validate()) return
+    if (!user) {
+      setSubmitError('You must be signed in.')
+      return
+    }
 
     setBusy(true)
     try {
-      const coverUrl = image ? await uploadImage(image, user.id) : ''
-      const payload: Database['public']['Tables']['experiments']['Insert'] = {
-        user_id: user.id,
-        title: title.trim(),
-        plant_count: Number(plantCount),
-        origin: origin.trim(),
-        initial_price: initialPrice.trim() ? Number(initialPrice) : null,
-        notes: notes.trim() || null,
-        cover_image_url: coverUrl || null,
-      }
-      const { error } = await supabase.from('experiments').insert(payload)
+      const imageUrl = image ? await uploadImage(image, user.id) : null
+      const { error } = await supabase.from('date_logs').insert({
+        experiment_id: id,
+        log_date: logDate,
+        status_details: statusDetails.trim(),
+        image_url: imageUrl,
+      })
       if (error) throw error
-      navigate('/experiments', {
+      navigate(`/experiments/${id}`, {
         replace: true,
-        state: { toast: 'Experiment created.' },
+        state: { toast: 'Log entry added.' },
       })
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Could not save experiment.')
+      setSubmitError(err instanceof Error ? err.message : 'Could not save log entry.')
       setBusy(false)
     }
   }
@@ -103,82 +94,43 @@ export default function CreateExperimentPage() {
     <section className="mx-auto max-w-lg">
       <div className="mb-4 flex items-center gap-2">
         <Link
-          to="/experiments"
+          to={id ? `/experiments/${id}` : '/experiments'}
           className="rounded-lg p-1.5 text-on-surface-variant hover:bg-surface-variant"
-          aria-label="Back to experiments"
+          aria-label="Back to experiment"
         >
           <ArrowLeft className="size-5" />
         </Link>
-        <h1 className="text-xl font-medium text-on-surface">New Experiment</h1>
+        <h1 className="text-xl font-medium text-on-surface">Add Log Entry</h1>
       </div>
 
       <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
         <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Title (plant species) *
+          Date *
           <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            type="date"
+            value={logDate}
+            max={today()}
+            onChange={(e) => setLogDate(e.target.value)}
             className={inputClass}
           />
-          {errors.title && <span className="text-xs text-error">{errors.title}</span>}
+          {errors.logDate && <span className="text-xs text-error">{errors.logDate}</span>}
         </label>
 
         <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Plant count *
-          <input
-            type="number"
-            min={1}
-            step={1}
-            inputMode="numeric"
-            value={plantCount}
-            onChange={(e) => setPlantCount(e.target.value)}
-            className={inputClass}
-          />
-          {errors.plantCount && (
-            <span className="text-xs text-error">{errors.plantCount}</span>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Origin (where purchased) *
-          <input
-            type="text"
-            value={origin}
-            onChange={(e) => setOrigin(e.target.value)}
-            className={inputClass}
-          />
-          {errors.origin && <span className="text-xs text-error">{errors.origin}</span>}
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Initial price
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            inputMode="decimal"
-            value={initialPrice}
-            onChange={(e) => setInitialPrice(e.target.value)}
-            className={inputClass}
-          />
-          {errors.initialPrice && (
-            <span className="text-xs text-error">{errors.initialPrice}</span>
-          )}
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Notes
+          Status details *
           <textarea
-            rows={3}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            rows={4}
+            value={statusDetails}
+            onChange={(e) => setStatusDetails(e.target.value)}
             className={inputClass}
           />
+          {errors.statusDetails && (
+            <span className="text-xs text-error">{errors.statusDetails}</span>
+          )}
         </label>
 
         <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Cover image
+          Photo
           <input
             ref={fileRef}
             type="file"
@@ -190,13 +142,13 @@ export default function CreateExperimentPage() {
             <div className="relative overflow-hidden rounded-lg ring-1 ring-outline-variant">
               <img
                 src={previewUrl}
-                alt="Cover preview"
+                alt="Photo preview"
                 className="aspect-video w-full object-cover"
               />
               <button
                 type="button"
                 onClick={clearImage}
-                aria-label="Remove image"
+                aria-label="Remove photo"
                 className="absolute right-2 top-2 rounded-lg bg-surface/80 p-1.5 text-on-surface-variant backdrop-blur hover:bg-surface hover:text-error"
               >
                 <X className="size-4" />
@@ -223,7 +175,7 @@ export default function CreateExperimentPage() {
 
         <div className="flex gap-3">
           <Link
-            to="/experiments"
+            to={id ? `/experiments/${id}` : '/experiments'}
             className="flex-1 rounded-lg px-4 py-2.5 text-center text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
           >
             Cancel
@@ -234,7 +186,7 @@ export default function CreateExperimentPage() {
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary disabled:opacity-60"
           >
             {busy && <Loader2 className="size-4 animate-spin" />}
-            Save experiment
+            Save entry
           </button>
         </div>
       </form>
