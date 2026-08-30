@@ -43,6 +43,10 @@ The web app is functional and in active use. Working today:
 
 - Sign-in and per-user private data
 - Folders, experiments, and dated log entries with photo uploads
+- **Folder-wide log entries** — from a folder, add one dated update (e.g. a water
+  change or a round of fertilizer) to every experiment in that folder at once.
+  Each experiment still gets its own entry, so it shows up in every individual
+  timeline.
 - Editing a folder's details, description, and cover image
 - PDF export of an experiment
 - Fertilizer log, pest reference, tips, and notes
@@ -51,6 +55,11 @@ Photos are automatically shrunk before upload so saving stays fast.
 
 ## Future steps
 
+- **Hosted deployment (no more local)** — today the interface only runs on your
+  own machine with `npm run dev`. The next step is deploying the web app to a
+  host so it has a public URL and other people can sign in and use it without
+  checking out the code. The data backend (Supabase) is already hosted; this is
+  about putting the frontend online and wiring up the production environment.
 - **Android app** — the project is already wrapped with Capacitor so the same web
   app can be installed as a native Android app. The next step is building and
   testing the APK in Android Studio, then adding native touches: using the phone
