@@ -11,6 +11,7 @@ import {
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
+import { useKeyboardOpen } from '../lib/native/useKeyboardOpen'
 import { purgeExpired } from '../lib/utils/bin'
 
 // Module scope, not a ref: the sweep should run once per page load, not once per
@@ -39,6 +40,7 @@ function navItemClass(isActive: boolean) {
 
 export default function Layout() {
   const { user, signOut } = useAuth()
+  const keyboardOpen = useKeyboardOpen()
 
   // Clear out anything past its 30-day restore window, photos included. Silent
   // by design: it's housekeeping, and a failure just means it retries next load.
@@ -97,15 +99,22 @@ export default function Layout() {
           ))}
         </nav>
 
-        <main className="min-w-0 flex-1 p-4 pb-24 md:pb-4">
+        <main
+          className={`min-w-0 flex-1 p-4 md:pb-4 ${
+            keyboardOpen ? 'pb-4' : 'pb-24'
+          }`}
+        >
           <Outlet />
         </main>
       </div>
 
-      {/* Mobile bottom navigation */}
+      {/* Mobile bottom navigation — hidden while the soft keyboard is up so it
+          doesn't float over the form. */}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-10 flex border-t border-outline-variant bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        className={`fixed inset-x-0 bottom-0 z-10 border-t border-outline-variant bg-surface pb-[env(safe-area-inset-bottom)] md:hidden ${
+          keyboardOpen ? 'hidden' : 'flex'
+        }`}
       >
         {NAV.map((item) => (
           <NavLink
