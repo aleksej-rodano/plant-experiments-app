@@ -1,4 +1,4 @@
-import { ImagePlus, Loader2, X } from 'lucide-react'
+import { Camera, ImagePlus, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
@@ -62,7 +62,9 @@ export default function DateLogForm({
   const [image, setImage] = useState<File | null>(null)
   const [currentUrl, setCurrentUrl] = useState(initial?.image_url ?? '')
   const [newPreviewUrl, setNewPreviewUrl] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  // Two separate inputs: one forces the camera, one opens the file/gallery picker.
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -96,7 +98,8 @@ export default function DateLogForm({
   function clearImage() {
     setImage(null)
     setCurrentUrl('')
-    if (fileRef.current) fileRef.current.value = ''
+    if (cameraRef.current) cameraRef.current.value = ''
+    if (galleryRef.current) galleryRef.current.value = ''
   }
 
   function validate() {
@@ -310,7 +313,15 @@ export default function DateLogForm({
       <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
         Photo
         <input
-          ref={fileRef}
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={(e) => pickImage(e.target.files?.[0])}
+          className="hidden"
+        />
+        <input
+          ref={galleryRef}
           type="file"
           accept="image/jpeg,image/png"
           onChange={(e) => pickImage(e.target.files?.[0])}
@@ -326,7 +337,14 @@ export default function DateLogForm({
             <div className="absolute right-2 top-2 flex gap-1.5">
               <button
                 type="button"
-                onClick={() => fileRef.current?.click()}
+                onClick={() => cameraRef.current?.click()}
+                className="rounded-lg bg-surface/80 px-2 py-1.5 text-xs font-medium text-on-surface-variant backdrop-blur hover:bg-surface"
+              >
+                Retake
+              </button>
+              <button
+                type="button"
+                onClick={() => galleryRef.current?.click()}
                 className="rounded-lg bg-surface/80 px-2 py-1.5 text-xs font-medium text-on-surface-variant backdrop-blur hover:bg-surface"
               >
                 Replace
@@ -342,14 +360,24 @@ export default function DateLogForm({
             </div>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant"
-          >
-            <ImagePlus className="size-5" />
-            Choose JPG or PNG
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => cameraRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant"
+            >
+              <Camera className="size-5" />
+              Take photo
+            </button>
+            <button
+              type="button"
+              onClick={() => galleryRef.current?.click()}
+              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant"
+            >
+              <ImagePlus className="size-5" />
+              Choose from device
+            </button>
+          </div>
         )}
         {errors.image && (
           <span className="text-xs text-error">{errors.image}</span>

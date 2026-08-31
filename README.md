@@ -66,7 +66,12 @@ on phones.
 The web app is **live at https://plant-experiments-app.vercel.app** (deployed
 from `main` via Vercel) and also runs locally with `npm run dev`. An Android
 build is working too: `npm run apk` produces an installable debug APK, with the
-hardware back button and a themed status bar/splash screen wired up.
+hardware back button and a themed status bar/splash screen wired up. The phone
+build is deliberately slimmer than the web app — it drops the PDF/CSV export
+buttons and the top-of-experiment photo shortcut (no file downloads on a phone),
+its bottom-bar labels are shortened (Exp. / Feeding / Pests), and adding a photo
+to a log entry offers an explicit **Take photo** vs **Choose from device**
+choice.
 
 Working today:
 
@@ -96,10 +101,11 @@ in that release will work.
 
 ## Future steps
 
-- **Native camera** — photo fields currently open the camera through the webview
-  file picker, which works. Swapping in the native `@capacitor/camera` plugin
-  would give a nicer capture flow (in-app preview, retake) and is the main
-  remaining Android polish item.
+- **Native camera** — the log form now gives a Take photo / Choose from device
+  choice, both routed through the webview file picker (the camera option uses
+  `capture="environment"`). Swapping in the native `@capacitor/camera` plugin
+  would add an in-app preview/retake step and is the main remaining Android
+  polish item.
 - **Release build** — the debug APK is built and installable now. A signed
   release build (own keystore, smaller optimised bundle) is only needed if the
   app is distributed more widely; steps are in `ANDROID_BUILD.md`.

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DateLogTimeline from '../components/DateLogTimeline'
 import MeasurementsChart from '../components/MeasurementsChart'
+import { isNativeApp } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { binExperiment } from '../lib/utils/bin'
 import { exportExperimentToCSV } from '../lib/utils/csvExport'
@@ -312,46 +313,53 @@ export default function ExperimentDetailPage() {
             <Pencil className="size-4" />
             <span className="hidden sm:inline">Edit</span>
           </Link>
-          <button
-            type="button"
-            onClick={() => void handleExport('pdf')}
-            disabled={exporting != null}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
-          >
-            {exporting === 'pdf' ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <FileDown className="size-4" />
-            )}
-            <span className="hidden sm:inline">
-              {exporting === 'pdf' ? 'Exporting…' : 'PDF'}
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleExport('csv')}
-            disabled={exporting != null}
-            title="Export log entries as a spreadsheet"
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
-          >
-            {exporting === 'csv' ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Sheet className="size-4" />
-            )}
-            <span className="hidden sm:inline">
-              {exporting === 'csv' ? 'Exporting…' : 'CSV'}
-            </span>
-          </button>
-          <Link
-            to={`/experiments/${experiment.id}/logs/photo`}
-            state={{ experiment, folder }}
-            title="Log a photo — note optional"
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
-          >
-            <Camera className="size-4" />
-            <span className="hidden sm:inline">Photo</span>
-          </Link>
+          {/* Export and the quick-photo shortcut are web-only — the phone app
+              drops them (no file downloads on device; photos go through the
+              log form's camera/gallery choice instead). */}
+          {!isNativeApp() && (
+            <>
+              <button
+                type="button"
+                onClick={() => void handleExport('pdf')}
+                disabled={exporting != null}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
+              >
+                {exporting === 'pdf' ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileDown className="size-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {exporting === 'pdf' ? 'Exporting…' : 'PDF'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleExport('csv')}
+                disabled={exporting != null}
+                title="Export log entries as a spreadsheet"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
+              >
+                {exporting === 'csv' ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sheet className="size-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {exporting === 'csv' ? 'Exporting…' : 'CSV'}
+                </span>
+              </button>
+              <Link
+                to={`/experiments/${experiment.id}/logs/photo`}
+                state={{ experiment, folder }}
+                title="Log a photo — note optional"
+                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+              >
+                <Camera className="size-4" />
+                <span className="hidden sm:inline">Photo</span>
+              </Link>
+            </>
+          )}
           <Link
             to={`/experiments/${experiment.id}/logs/new`}
             state={{ experiment, folder }}

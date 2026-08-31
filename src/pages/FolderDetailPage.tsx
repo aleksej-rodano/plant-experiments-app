@@ -18,6 +18,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import CareBanner from '../components/CareBanner'
 import ComparisonChart from '../components/ComparisonChart'
 import WinnerCallout from '../components/WinnerCallout'
+import { isNativeApp } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { binFolder } from '../lib/utils/bin'
 import { today } from '../lib/utils/care'
@@ -264,7 +265,7 @@ export default function FolderDetailPage() {
             <Pencil className="size-4" />
             <span className="hidden sm:inline">Edit</span>
           </Link>
-          {experiments.length > 0 && (
+          {experiments.length > 0 && !isNativeApp() && (
             <button
               type="button"
               onClick={() => exportFolderToCSV(folder, experiments, logs)}

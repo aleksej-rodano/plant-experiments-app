@@ -17,14 +17,16 @@ import { purgeExpired } from '../lib/utils/bin'
 // mount (React StrictMode mounts twice in development).
 let sweptThisSession = false
 
+// `label` shows in the desktop rail; `short` (when set) shows in the cramped
+// mobile bottom bar.
 const NAV = [
-  { to: '/experiments', label: 'Experiments', icon: Sprout },
+  { to: '/experiments', label: 'Experiments', short: 'Exp.', icon: Sprout },
   { to: '/stats', label: 'Stats', icon: BarChart3 },
-  { to: '/fertilizer-log', label: 'Fertilizer Log', icon: Droplets },
-  { to: '/pest-control', label: 'Pest Control', icon: Bug },
+  { to: '/fertilizer-log', label: 'Fertilizer Log', short: 'Feeding', icon: Droplets },
+  { to: '/pest-control', label: 'Pest Control', short: 'Pests', icon: Bug },
   { to: '/tips', label: 'Tips', icon: Lightbulb },
   { to: '/notes', label: 'Notes', icon: NotebookPen },
-]
+] as const
 
 function navItemClass(isActive: boolean) {
   return [
@@ -50,7 +52,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-full flex-col bg-background text-on-background">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-primary px-4 py-3 text-on-primary shadow-sm">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-on-primary shadow-sm">
         <div className="flex items-center gap-2">
           <Sprout className="size-6" />
           <span className="text-lg font-medium">Plant Experiments</span>
@@ -103,12 +105,12 @@ export default function Layout() {
       {/* Mobile bottom navigation */}
       <nav
         aria-label="Primary"
-        className="fixed inset-x-0 bottom-0 z-10 flex border-t border-outline-variant bg-surface md:hidden"
+        className="fixed inset-x-0 bottom-0 z-10 flex border-t border-outline-variant bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        {NAV.map(({ to, label, icon: Icon }) => (
+        {NAV.map((item) => (
           <NavLink
-            key={to}
-            to={to}
+            key={item.to}
+            to={item.to}
             className={({ isActive }) =>
               [
                 'flex flex-1 flex-col items-center gap-1 py-2 text-xs font-medium',
@@ -124,9 +126,9 @@ export default function Layout() {
                     isActive ? 'bg-primary-container text-on-primary-container' : '',
                   ].join(' ')}
                 >
-                  <Icon className="size-5" />
+                  <item.icon className="size-5" />
                 </span>
-                {label}
+                {'short' in item ? item.short : item.label}
               </>
             )}
           </NavLink>
