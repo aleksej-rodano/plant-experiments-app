@@ -59,7 +59,7 @@ function PestPhoto({
           <img
             src={guide.image_url}
             alt={`${guide.pest_name} reference photo`}
-            className="w-full rounded-lg object-cover ring-1 ring-outline-variant"
+            className="w-2/3 max-w-xs rounded-lg object-cover ring-1 ring-outline-variant"
             loading="lazy"
           />
           <figcaption className="mt-1.5">
