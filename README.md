@@ -57,7 +57,9 @@ Other tabs:
   (2–3 months).
 - **Pest Control** — a reference of common pests with quick treatment steps and a
   fuller protocol for the ones covered in detail.
-- **Tips** — short propagation reference notes.
+- **Tips** — short reference notes: propagation technique plus care for
+  specific plants (a pothos & Monstera section covers the aroid triple mix,
+  watering, and getting fenestrated leaves).
 - **Notes** — free-form notes with optional photos.
 
 The layout adapts to the screen: a side navigation rail on desktop, a bottom bar
