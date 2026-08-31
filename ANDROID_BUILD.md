@@ -6,28 +6,48 @@ project lives in `android/` and is checked into git; `dist/` is copied into it b
 
 ## One-time setup on your machine
 
-1. Install **Android Studio** (bundles the Android SDK + an emulator).
-2. Install a **JDK 21** (Android Studio ships one under
-   `…/Android Studio/jbr` — pointing `JAVA_HOME` at that is enough).
-3. First launch of Android Studio: let it install the SDK and accept licenses.
+1. Install **Android Studio** (bundles the Android SDK + an emulator). On first
+   launch let its Setup Wizard install the SDK and accept the licenses.
+2. Open the `android/` folder in Android Studio once (**File → Open →** pick
+   `android/`). Let the Gradle sync finish — it downloads Gradle, the Android
+   Gradle Plugin, and provisions a **JDK 21** under `~/.jdks/`. When prompted for
+   the Gradle JVM, choose **"Use JVM 21"**.
+3. For **command-line** builds (`npm run apk`), the wrapper script needs
+   `JAVA_HOME`. Set it once to the JDK Studio downloaded, e.g. on Windows:
+
+   ```powershell
+   setx JAVA_HOME "$env:USERPROFILE\.jdks\jbr-21.0.11"
+   ```
+
+   (Adjust the folder name to whatever exists under `~/.jdks`. Building from
+   inside Android Studio does **not** need this — the IDE manages its own JDK.)
 
 ## Every time you change the web app
 
 ```bash
-npm run cap:sync      # build + copy web assets into android/
+npm run cap:sync      # build web + copy assets into android/
 ```
 
-Then in Android Studio press **Run** (device or emulator), or from the CLI:
+Then in Android Studio press **Run** (device or emulator).
 
-```bash
-npm run android       # build + sync + open Android Studio
-```
+`npm run android` also opens Android Studio — but **don't run it while Studio is
+already open**, the two instances collide. Use `npm run cap:sync` for that case.
 
 ## Producing an APK
 
-In Android Studio: **Build → Build Bundle(s) / APK(s) → Build APK(s)**.
-The debug APK lands in
-`android/app/build/outputs/apk/debug/app-debug.apk`.
+From the CLI (needs `JAVA_HOME`, see setup step 3):
+
+```bash
+npm run apk           # build web + sync + assembleDebug
+```
+
+Or in Android Studio: **Build → Build App Bundle(s) / APK(s) → Build APK(s)**.
+
+Either way the debug APK lands at
+`android/app/build/outputs/apk/debug/app-debug.apk` (~4.6 MB). Install it on a
+USB-connected phone with `npm run apk:install` (runs `adb install -r`), or copy
+the file to the phone and tap it (allow "install unknown apps" for the app that
+opens it).
 
 For a shareable release build you'll need to generate a signing keystore
 (**Build → Generate Signed Bundle / APK**) and keep the `.jks` file out of git.

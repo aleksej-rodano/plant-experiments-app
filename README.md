@@ -63,7 +63,12 @@ on phones.
 
 ## Current state
 
-The web app is functional and in active use. Working today:
+The web app is **live at https://plant-experiments-app.vercel.app** (deployed
+from `main` via Vercel) and also runs locally with `npm run dev`. An Android
+build is working too: `npm run apk` produces an installable debug APK, with the
+hardware back button and a themed status bar/splash screen wired up.
+
+Working today:
 
 - Sign-in and per-user private data
 - Folders, experiments, and dated log entries with photo uploads
@@ -91,21 +96,13 @@ in that release will work.
 
 ## Future steps
 
-- **Hosted deployment (no more local)** — the repo is now wired for
-  [Vercel](https://vercel.com): `vercel.json` sets the Vite framework preset and
-  an SPA fallback so deep links work. What's left is a one-time account step —
-  import the GitHub repo into Vercel and add the two `VITE_SUPABASE_*`
-  environment variables — after which every push to `main` deploys automatically.
-  See "Deploying the web app" below. The data backend (Supabase) is already
-  hosted.
-- **Android app** — the project is wrapped with Capacitor and the native
-  `android/` project is checked in. The hardware **back button** now navigates
-  within the app (deep screens step back, the top-level tabs fall back to
-  Experiments, and Experiments exits), and the **status bar / splash screen**
-  are themed to match. Photo fields already open the camera through the webview.
-  What's left is building and testing the APK in Android Studio (see
-  `ANDROID_BUILD.md`) and, optionally, swapping the webview file picker for the
-  native `@capacitor/camera` plugin.
+- **Native camera** — photo fields currently open the camera through the webview
+  file picker, which works. Swapping in the native `@capacitor/camera` plugin
+  would give a nicer capture flow (in-app preview, retake) and is the main
+  remaining Android polish item.
+- **Release build** — the debug APK is built and installable now. A signed
+  release build (own keystore, smaller optimised bundle) is only needed if the
+  app is distributed more widely; steps are in `ANDROID_BUILD.md`.
 - Smaller polish: offline tolerance, and tidying a few rough edges in the pest
   and tips sections.
 
@@ -117,8 +114,9 @@ npm run dev
 ```
 
 Configuration (Supabase URL and key) lives in a git-ignored `.env.local` file.
-Build the production web bundle with `npm run build`; `npm run android` opens the
-Android project in Android Studio.
+Build the production web bundle with `npm run build`. For the Android app,
+`npm run apk` builds a debug APK and `npm run apk:install` pushes it to a
+USB-connected phone — see `ANDROID_BUILD.md` for the one-time toolchain setup.
 
 ## Deploying the web app
 
