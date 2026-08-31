@@ -10,7 +10,43 @@ const CATEGORY_ORDER = [
   'Rooting',
   'Environment & timing',
   'Method & fixes',
+  'Pothos & Monstera',
 ]
+
+/**
+ * Render a tip body. Lines that start with a dash/bullet are laid out as a
+ * flex row with the marker in its own column, so wrapped text hangs under the
+ * first word instead of sliding back to the left margin.
+ */
+function TipContent({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col gap-1.5 text-sm text-on-surface-variant">
+      {text.split('\n').map((line, i) => {
+        const bullet = /^\s*[-•*]\s+(.*)$/.exec(line)
+        if (bullet) {
+          return (
+            <div key={i} className="flex gap-2">
+              <span aria-hidden className="shrink-0 select-none">
+                •
+              </span>
+              <span className="min-w-0 flex-1 whitespace-pre-wrap">
+                {bullet[1]}
+              </span>
+            </div>
+          )
+        }
+        if (line.trim() === '') {
+          return <span key={i} aria-hidden className="block h-1.5" />
+        }
+        return (
+          <p key={i} className="whitespace-pre-wrap">
+            {line}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
 
 interface Category {
   name: string
@@ -141,9 +177,7 @@ export default function TipsPage() {
                   <h2 className="mb-2 text-lg font-bold text-on-surface">
                     {tip.title}
                   </h2>
-                  <p className="whitespace-pre-wrap text-sm text-on-surface-variant">
-                    {tip.content}
-                  </p>
+                  <TipContent text={tip.content} />
                 </article>
               ))}
             </div>
