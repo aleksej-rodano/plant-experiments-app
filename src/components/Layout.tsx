@@ -101,9 +101,11 @@ export default function Layout() {
 
         <main
           className={`min-w-0 flex-1 p-4 md:pb-4 ${
-            keyboardOpen ? 'pb-4' : 'pb-24'
+            keyboardOpen ? 'pb-[55vh]' : 'pb-24'
           }`}
         >
+          {/* Extra bottom padding while the keyboard is up (resize:"none" means
+              the web view keeps full height) so any field can scroll clear of it. */}
           <Outlet />
         </main>
       </div>
