@@ -16,11 +16,10 @@ const config: CapacitorConfig = {
       androidSplashResourceName: 'splash',
     },
     Keyboard: {
-      // Don't resize the web view at all — "native" left a large blank gap
-      // between the form and the keyboard on the S9+. With "none" the keyboard
-      // just overlays the web view and Android scrolls the focused field into
-      // view; the bottom nav (behind the keyboard) is hidden via useKeyboardOpen.
-      resize: 'none',
+      // Android resizes the window when the keyboard opens; the Layout is a
+      // fixed-height flex column whose <main> is the only scroller, so it
+      // shrinks cleanly and scrolls the focused field into view — no dead gap.
+      resize: 'native',
     },
   },
 }

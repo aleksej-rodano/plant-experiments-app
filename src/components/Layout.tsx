@@ -53,8 +53,10 @@ export default function Layout() {
   }, [user])
 
   return (
-    <div className="flex min-h-full flex-col bg-background text-on-background">
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-on-primary shadow-sm">
+    // Fixed to the viewport; <main> is the only thing that scrolls. This keeps
+    // the soft keyboard from leaving a dead gap under the content on Android.
+    <div className="flex h-full flex-col overflow-hidden bg-background text-on-background">
+      <header className="flex shrink-0 items-center justify-between gap-3 bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-on-primary shadow-sm">
         <div className="flex items-center gap-2">
           <Sprout className="size-6" />
           <span className="text-lg font-medium">Plant Experiments</span>
@@ -85,11 +87,11 @@ export default function Layout() {
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-5xl flex-1">
+      <div className="mx-auto flex w-full max-w-5xl flex-1 overflow-hidden">
         {/* Desktop navigation rail */}
         <nav
           aria-label="Primary"
-          className="hidden w-56 shrink-0 flex-col gap-1 border-r border-outline-variant p-3 md:flex"
+          className="hidden w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-outline-variant p-3 md:flex"
         >
           {NAV.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} className={({ isActive }) => navItemClass(isActive)}>
@@ -99,19 +101,18 @@ export default function Layout() {
           ))}
         </nav>
 
-        <main className="min-w-0 flex-1 p-4 pb-24 md:pb-4">
+        <main className="min-w-0 flex-1 overflow-y-auto p-4">
           <Outlet />
         </main>
       </div>
 
-      {/* Mobile bottom navigation — hidden while the soft keyboard is up so it
-          doesn't float over the form. */}
-      <nav
-        aria-label="Primary"
-        className={`fixed inset-x-0 bottom-0 z-10 border-t border-outline-variant bg-surface pb-[env(safe-area-inset-bottom)] md:hidden ${
-          keyboardOpen ? 'hidden' : 'flex'
-        }`}
-      >
+      {/* Mobile bottom navigation — a normal flex child (not fixed), dropped
+          entirely while the soft keyboard is up. */}
+      {!keyboardOpen && (
+        <nav
+          aria-label="Primary"
+          className="flex shrink-0 border-t border-outline-variant bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+        >
         {NAV.map((item) => (
           <NavLink
             key={item.to}
@@ -136,9 +137,10 @@ export default function Layout() {
                 {'short' in item ? item.short : item.label}
               </>
             )}
-          </NavLink>
-        ))}
-      </nav>
+            </NavLink>
+          ))}
+        </nav>
+      )}
     </div>
   )
 }
