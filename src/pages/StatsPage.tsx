@@ -19,6 +19,7 @@ function median(values: number[]): number | null {
 }
 
 interface Group {
+  /** Display text — the first spelling seen, not the normalised grouping key. */
   key: string
   plants: number
   alive: number
@@ -26,17 +27,22 @@ interface Group {
   rate: number | null
 }
 
-/** Roll summaries up by an arbitrary label (folder title, origin, …). */
+/**
+ * Roll summaries up by an arbitrary label (folder title, origin, …). Grouping is
+ * case-insensitive so "WDWD" and "wdwd" count as one treatment, but the label
+ * shown is the first spelling encountered rather than the lowercased key.
+ */
 function groupBy(
   summaries: ExperimentSummary[],
   label: (s: ExperimentSummary) => string | null,
 ): Group[] {
   const map = new Map<string, Group>()
   for (const s of summaries) {
-    const key = label(s)
-    if (!key || s.initial == null || s.initial <= 0) continue
+    const raw = label(s)
+    if (!raw || s.initial == null || s.initial <= 0) continue
+    const key = raw.toLowerCase()
     const g = map.get(key) ?? {
-      key,
+      key: raw,
       plants: 0,
       alive: 0,
       experiments: 0,
@@ -195,7 +201,7 @@ export default function StatsPage() {
     [summaries, folders],
   )
   const byTreatment = useMemo(
-    () => groupBy(summaries, (s) => s.experiment.title.trim().toLowerCase()),
+    () => groupBy(summaries, (s) => s.experiment.title.trim()),
     [summaries],
   )
 
