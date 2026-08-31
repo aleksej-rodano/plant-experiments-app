@@ -91,18 +91,23 @@ in that release will work.
 
 ## Future steps
 
-- **Hosted deployment (no more local)** — today the interface only runs on your
-  own machine with `npm run dev`. The next step is deploying the web app to a
-  host so it has a public URL and other people can sign in and use it without
-  checking out the code. The data backend (Supabase) is already hosted; this is
-  about putting the frontend online and wiring up the production environment.
-- **Android app** — the project is already wrapped with Capacitor so the same web
-  app can be installed as a native Android app. The next step is building and
-  testing the APK in Android Studio, then adding native touches: using the phone
-  camera directly for photos, and making the hardware back button navigate within
-  the app instead of closing it.
-- Smaller polish: quicker photo capture, offline tolerance, and tidying a few
-  rough edges in the pest and tips sections.
+- **Hosted deployment (no more local)** — the repo is now wired for
+  [Vercel](https://vercel.com): `vercel.json` sets the Vite framework preset and
+  an SPA fallback so deep links work. What's left is a one-time account step —
+  import the GitHub repo into Vercel and add the two `VITE_SUPABASE_*`
+  environment variables — after which every push to `main` deploys automatically.
+  See "Deploying the web app" below. The data backend (Supabase) is already
+  hosted.
+- **Android app** — the project is wrapped with Capacitor and the native
+  `android/` project is checked in. The hardware **back button** now navigates
+  within the app (deep screens step back, the top-level tabs fall back to
+  Experiments, and Experiments exits), and the **status bar / splash screen**
+  are themed to match. Photo fields already open the camera through the webview.
+  What's left is building and testing the APK in Android Studio (see
+  `ANDROID_BUILD.md`) and, optionally, swapping the webview file picker for the
+  native `@capacitor/camera` plugin.
+- Smaller polish: offline tolerance, and tidying a few rough edges in the pest
+  and tips sections.
 
 ## Running it locally
 
@@ -114,3 +119,23 @@ npm run dev
 Configuration (Supabase URL and key) lives in a git-ignored `.env.local` file.
 Build the production web bundle with `npm run build`; `npm run android` opens the
 Android project in Android Studio.
+
+## Deploying the web app
+
+The frontend is a static Vite build; Supabase is the backend and is already
+hosted. Deployment is configured for Vercel (`vercel.json`). One-time setup:
+
+1. At [vercel.com/new](https://vercel.com/new), sign in with GitHub and import
+   the `plant-experiments-app` repository. Vercel reads `vercel.json`, so the
+   framework, build command (`npm run build`) and output (`dist`) are already
+   set — don't override them.
+2. Under **Environment Variables** add, for all environments:
+   - `VITE_SUPABASE_URL` — same value as in your local `.env.local`
+   - `VITE_SUPABASE_ANON_KEY` — same value as in your local `.env.local`
+   (The anon key is safe in a client bundle; row-level security is what protects
+   the data.)
+3. Click **Deploy**. You get a `*.vercel.app` URL; every later push to `main`
+   redeploys automatically.
+4. Optional: in Supabase → **Authentication → URL Configuration**, set the Site
+   URL to your Vercel URL. Only needed if you later turn email confirmation back
+   on (it's currently disabled).

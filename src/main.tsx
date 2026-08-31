@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
 import { AuthProvider } from './lib/AuthProvider.tsx'
+import { initNative } from './lib/native'
+
+void initNative()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

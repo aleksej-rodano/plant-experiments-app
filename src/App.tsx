@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { useAuth } from './lib/hooks/useAuth'
+import { useAndroidBackButton } from './lib/native/useAndroidBackButton'
 import AddDateLogPage from './pages/AddDateLogPage'
 import AddFolderDateLogPage from './pages/AddFolderDateLogPage'
 import BinPage from './pages/BinPage'
@@ -38,11 +39,17 @@ function RequireAuth() {
   return user ? <Outlet /> : <Navigate to="/login" replace />
 }
 
+function RouterEffects() {
+  useAndroidBackButton()
+  return null
+}
+
 function App() {
   const { user, loading } = useAuth()
 
   return (
     <BrowserRouter>
+      <RouterEffects />
       <Routes>
         <Route
           path="/login"
