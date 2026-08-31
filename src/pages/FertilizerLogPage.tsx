@@ -38,9 +38,26 @@ function SeasonGuide() {
         </li>
       </ul>
       <p className="mt-2 text-on-surface-variant">
-        Always feed onto damp soil, never bone-dry roots, and skip a stressed or
-        newly repotted plant.
+        Always feed onto damp soil, never bone-dry roots, and skip a stressed
+        plant.
       </p>
+
+      <h2 className="mb-2 mt-4 font-medium text-on-surface-variant">
+        New and freshly repotted plants
+      </h2>
+      <ul className="flex flex-col gap-1.5">
+        <li>
+          <span className="font-medium">After potting or repotting</span> — wait
+          at least 6–8 weeks before the first feed. Fresh mix already holds
+          nutrients and cut roots scorch easily; hold off until you see new
+          growth.
+        </li>
+        <li>
+          <span className="font-medium">Plants just bought from a garden
+          centre</span> — leave them 2–3 months. Nursery stock is grown on heavy
+          slow-release fertilizer and still has plenty left in the pot.
+        </li>
+      </ul>
     </div>
   )
 }

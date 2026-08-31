@@ -52,7 +52,9 @@ Other tabs:
 - **Stats** — everything across every folder: overall survival, median days to
   root, and survival broken down by treatment, folder, and origin.
 - **Fertilizer Log** — a simple running list of the dates you fed your plants,
-  plus a seasonal feeding-frequency guide.
+  plus a feeding guide: frequency by season, and how long to wait before feeding
+  freshly potted plants (6–8 weeks) or ones just bought from a garden centre
+  (2–3 months).
 - **Pest Control** — a reference of common pests with quick treatment steps and a
   fuller protocol for the ones covered in detail.
 - **Tips** — short propagation reference notes.
@@ -71,7 +73,10 @@ build is deliberately slimmer than the web app — it drops the PDF/CSV export
 buttons and the top-of-experiment photo shortcut (no file downloads on a phone),
 its bottom-bar labels are shortened (Exp. / Feeding / Pests), and adding a photo
 to a log entry offers an explicit **Take photo** vs **Choose from device**
-choice. When the soft keyboard opens, Android shrinks the app window
+choice. The auth token is stored through `@capacitor/preferences` (native
+`SharedPreferences`) rather than the WebView's `localStorage`, which the OS was
+evicting on cold start and logging the user out — you now stay signed in until
+you explicitly sign out. When the soft keyboard opens, Android shrinks the app window
 (`android:windowSoftInputMode="adjustResize"` on the activity) so the layout
 shrinks with it and the focused field scrolls into view.
 
