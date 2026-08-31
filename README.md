@@ -71,7 +71,8 @@ build is deliberately slimmer than the web app — it drops the PDF/CSV export
 buttons and the top-of-experiment photo shortcut (no file downloads on a phone),
 its bottom-bar labels are shortened (Exp. / Feeding / Pests), and adding a photo
 to a log entry offers an explicit **Take photo** vs **Choose from device**
-choice.
+choice. The `@capacitor/keyboard` plugin resizes the web view when the soft
+keyboard opens so text fields stay visible while typing.
 
 Working today:
 

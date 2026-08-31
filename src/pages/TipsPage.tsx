@@ -108,14 +108,15 @@ export default function TipsPage() {
         </div>
       ) : (
         <>
-          {/* Categories — horizontal, scrollable; tap one to open its tips */}
-          <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1">
+          {/* Categories — wrap onto as many lines as needed so all are visible
+              at once; tap one to open its tips */}
+          <div className="mb-4 flex flex-wrap gap-2">
             {categories.map((c) => (
               <button
                 key={c.name}
                 type="button"
                 onClick={() => setActiveCategory(c.name)}
-                className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   c.name === current?.name
                     ? 'bg-primary text-on-primary'
                     : 'bg-surface-container text-on-surface-variant hover:bg-surface-variant'
