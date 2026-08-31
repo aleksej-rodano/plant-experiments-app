@@ -75,13 +75,34 @@ choice. When the soft keyboard opens, Android shrinks the app window
 (`android:windowSoftInputMode="adjustResize"` on the activity) so the layout
 shrinks with it and the focused field scrolls into view.
 
-Worth knowing if you ever touch that: `@capacitor/keyboard`'s `resize` option
-does **nothing** on Android. The plugin never calls `setSoftInputMode` and never
-reads that key — `setResizeMode` is `unimplemented()` — so it is iOS-only.
-Without the manifest attribute the window defaults to `adjustPan`, the web view
-keeps its full screen height, and the unused space inside `<main>` shows up as a
-dead band above the keyboard. `adb shell dumpsys window windows | grep sim=`
-reports which mode the window is actually in.
+Two traps live behind that one line, both of which produce the same symptom — a
+dead band between the form and the keyboard — so they are worth writing down.
+
+**`@capacitor/keyboard`'s `resize` option does nothing on Android.** The plugin
+never calls `setSoftInputMode` and never reads that key (`setResizeMode` is
+`unimplemented()`); it is iOS-only. Without the manifest attribute the window
+defaults to `adjustPan`, the web view keeps its full screen height, and the
+unused space inside `<main>` shows up as the dead band.
+
+**The page must not ask for `viewport-fit=cover`.** Capacitor's built-in
+`SystemBars` plugin pads the web view's parent by the keyboard inset when the
+page requests cover *and* the system web view is >= 140. That is the right thing
+on Android 15+, where the window does not resize — but on Android 14 and below
+`adjustResize` has already shrunk the window, so the inset is subtracted twice
+and the web view collapses to a sliver of its parent. `SystemBars` still handles
+insets on Android 15+ without the meta tag (that branch is gated on the SDK
+level, not on the tag), so dropping it costs nothing.
+
+Both are diagnosable over adb rather than by guessing:
+
+```bash
+adb shell dumpsys window windows | grep sim=
+```
+
+reports the window's real soft-input mode (`adjust=resize` vs `adjust=pan`), and
+`adb shell uiautomator dump /sdcard/ui.xml` shows whether the `WebView` bounds
+match its parent `ViewGroup` — if the web view is shorter, something is
+subtracting the inset twice.
 
 Working today:
 

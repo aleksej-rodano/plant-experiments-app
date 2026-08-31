@@ -11,7 +11,7 @@ import {
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
-import { useKeyboardState } from '../lib/native/useKeyboardState'
+import { useKeyboardOpen } from '../lib/native/useKeyboardOpen'
 import { purgeExpired } from '../lib/utils/bin'
 
 // Module scope, not a ref: the sweep should run once per page load, not once per
@@ -40,7 +40,7 @@ function navItemClass(isActive: boolean) {
 
 export default function Layout() {
   const { user, signOut } = useAuth()
-  const { open: keyboardOpen, inset: keyboardInset } = useKeyboardState()
+  const keyboardOpen = useKeyboardOpen()
 
   // Clear out anything past its 30-day restore window, photos included. Silent
   // by design: it's housekeeping, and a failure just means it retries next load.
@@ -53,16 +53,12 @@ export default function Layout() {
   }, [user])
 
   return (
-    // Fixed to the viewport; <main> is the only thing that scrolls. Normally
-    // Android shrinks the window for the soft keyboard (adjustResize) and the
-    // 100% height follows it; `keyboardInset` is the fallback for shells that
-    // pan the window instead and would otherwise leave a dead gap above the
-    // keyboard. See useKeyboardState.
-    <div
-      className="flex h-full flex-col overflow-hidden bg-background text-on-background"
-      style={keyboardInset ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
-    >
-      <header className="flex shrink-0 items-center justify-between gap-3 bg-primary px-4 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-on-primary shadow-sm">
+    // Fixed to the viewport; <main> is the only thing that scrolls. Android
+    // shrinks this window for the soft keyboard (adjustResize, set in the
+    // manifest), so the 100% height follows it and <main> scrolls the focused
+    // field into view. See useKeyboardOpen.
+    <div className="flex h-full flex-col overflow-hidden bg-background text-on-background">
+      <header className="flex shrink-0 items-center justify-between gap-3 bg-primary px-4 py-3 text-on-primary shadow-sm">
         <div className="flex items-center gap-2">
           <Sprout className="size-6" />
           <span className="text-lg font-medium">Plant Experiments</span>
@@ -117,7 +113,7 @@ export default function Layout() {
       {!keyboardOpen && (
         <nav
           aria-label="Primary"
-          className="flex shrink-0 border-t border-outline-variant bg-surface pb-[env(safe-area-inset-bottom)] md:hidden"
+          className="flex shrink-0 border-t border-outline-variant bg-surface md:hidden"
         >
         {NAV.map((item) => (
           <NavLink

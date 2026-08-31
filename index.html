@@ -3,10 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    />
+    <!-- Deliberately no viewport-fit=cover. Capacitor's SystemBars plugin only
+         pads the web view's parent by the keyboard inset when the page asks for
+         cover *and* the system web view is >= 140 — and on Android 14 and below
+         the window has already been shrunk by adjustResize, so that padding is
+         subtracted a second time and collapses the web view to a sliver. The
+         status bar is kept off the web layer by StatusBar.setOverlaysWebView
+         instead; see src/lib/native/index.ts. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
