@@ -84,6 +84,10 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      <p className="mt-6 text-center text-xs text-on-surface-variant/70">
+        Build {__BUILD_TIME__}
+      </p>
     </section>
   )
 }

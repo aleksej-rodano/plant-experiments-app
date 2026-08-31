@@ -36,7 +36,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-full items-center justify-center bg-background p-6">
+    <main className="flex min-h-full flex-col items-center justify-center bg-background p-6">
       <div className="w-full max-w-sm rounded-lg bg-surface p-6 shadow-md ring-1 ring-outline-variant">
         <div className="mb-6 flex items-center gap-2 text-primary">
           <Sprout className="size-7" />
@@ -104,6 +104,10 @@ export default function LoginPage() {
             : 'Already have an account? Sign in'}
         </button>
       </div>
+
+      <p className="mt-4 text-xs text-on-surface-variant/70">
+        Build {__BUILD_TIME__}
+      </p>
     </main>
   )
 }
