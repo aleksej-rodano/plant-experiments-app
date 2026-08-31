@@ -71,8 +71,17 @@ build is deliberately slimmer than the web app — it drops the PDF/CSV export
 buttons and the top-of-experiment photo shortcut (no file downloads on a phone),
 its bottom-bar labels are shortened (Exp. / Feeding / Pests), and adding a photo
 to a log entry offers an explicit **Take photo** vs **Choose from device**
-choice. The `@capacitor/keyboard` plugin resizes the web view when the soft
-keyboard opens so text fields stay visible while typing.
+choice. When the soft keyboard opens, Android shrinks the app window
+(`android:windowSoftInputMode="adjustResize"` on the activity) so the layout
+shrinks with it and the focused field scrolls into view.
+
+Worth knowing if you ever touch that: `@capacitor/keyboard`'s `resize` option
+does **nothing** on Android. The plugin never calls `setSoftInputMode` and never
+reads that key — `setResizeMode` is `unimplemented()` — so it is iOS-only.
+Without the manifest attribute the window defaults to `adjustPan`, the web view
+keeps its full screen height, and the unused space inside `<main>` shows up as a
+dead band above the keyboard. `adb shell dumpsys window windows | grep sim=`
+reports which mode the window is actually in.
 
 Working today:
 

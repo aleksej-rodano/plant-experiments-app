@@ -15,12 +15,11 @@ const config: CapacitorConfig = {
       backgroundColor: '#1b5e20',
       androidSplashResourceName: 'splash',
     },
-    Keyboard: {
-      // Android resizes the window when the keyboard opens; the Layout is a
-      // fixed-height flex column whose <main> is the only scroller, so it
-      // shrinks cleanly and scrolls the focused field into view — no dead gap.
-      resize: 'native',
-    },
+    // No Keyboard config: on Android the plugin ignores `resize` entirely (it
+    // never calls setSoftInputMode, and setResizeMode is unimplemented) — that
+    // option is iOS-only. What decides the behaviour is
+    // android:windowSoftInputMode="adjustResize" on the activity in
+    // AndroidManifest.xml. Don't re-add `resize` here expecting an effect.
   },
 }
 
