@@ -29,8 +29,17 @@ export default function AddDateLogPage() {
       const [expRes, logRes] = await Promise.all([
         experiment
           ? Promise.resolve({ data: experiment, error: null })
-          : supabase.from('experiments').select().eq('id', id).maybeSingle(),
-        supabase.from('date_logs').select('deaths_count').eq('experiment_id', id),
+          : supabase
+              .from('experiments')
+              .select()
+              .eq('id', id)
+              .is('deleted_at', null)
+              .maybeSingle(),
+        supabase
+          .from('date_logs')
+          .select('deaths_count')
+          .eq('experiment_id', id)
+          .is('deleted_at', null),
       ])
       if (cancelled) return
       if (expRes.error) setError(expRes.error.message)

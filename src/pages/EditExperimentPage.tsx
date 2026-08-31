@@ -61,6 +61,7 @@ export default function EditExperimentPage() {
         .from('experiments')
         .select()
         .eq('id', id)
+        .is('deleted_at', null)
         .maybeSingle()
       if (cancelled) return
       if (error) {

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import FolderCard from '../components/FolderCard'
 import { supabase } from '../lib/supabase'
+import { binFolder } from '../lib/utils/bin'
 import { survivorCount } from '../lib/utils/survival'
 import type { Folder } from '../types/database'
 
@@ -42,15 +43,18 @@ export default function FoldersPage() {
         supabase
           .from('folders')
           .select()
+          .is('deleted_at', null)
           .order('created_at', { ascending: false })
           .abortSignal(controller.signal),
         supabase
           .from('experiments')
           .select('id, folder_id, plant_count')
+          .is('deleted_at', null)
           .abortSignal(controller.signal),
         supabase
           .from('date_logs')
           .select('experiment_id, deaths_count')
+          .is('deleted_at', null)
           .abortSignal(controller.signal),
       ])
       if (foldersRes.error) throw foldersRes.error
@@ -99,12 +103,15 @@ export default function FoldersPage() {
   }, [load])
 
   async function handleDelete(id: string) {
-    const { error } = await supabase.from('folders').delete().eq('id', id)
-    if (error) {
-      setError(error.message)
+    try {
+      await binFolder(id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete the folder.')
       return
     }
     setFolders((prev) => prev.filter((f) => f.id !== id))
+    setToast('Folder moved to the bin.')
+    setTimeout(() => setToast(null), 3000)
   }
 
   return (

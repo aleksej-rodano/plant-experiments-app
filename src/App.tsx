@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom
 import Layout from './components/Layout'
 import { useAuth } from './lib/hooks/useAuth'
 import AddDateLogPage from './pages/AddDateLogPage'
+import AddFolderDateLogPage from './pages/AddFolderDateLogPage'
+import BinPage from './pages/BinPage'
 import CreateExperimentPage from './pages/CreateExperimentPage'
 import CreateFolderPage from './pages/CreateFolderPage'
 import EditDateLogPage from './pages/EditDateLogPage'
@@ -15,7 +17,9 @@ import FoldersPage from './pages/FoldersPage'
 import LoginPage from './pages/LoginPage'
 import NotesPage from './pages/NotesPage'
 import PestControlPage from './pages/PestControlPage'
+import QuickPhotoLogPage from './pages/QuickPhotoLogPage'
 import SettingsPage from './pages/SettingsPage'
+import StatsPage from './pages/StatsPage'
 import TipsPage from './pages/TipsPage'
 
 function FullScreenLoader() {
@@ -66,6 +70,10 @@ function App() {
               path="/folders/:folderId/experiments/new"
               element={<CreateExperimentPage />}
             />
+            <Route
+              path="/folders/:folderId/logs/new"
+              element={<AddFolderDateLogPage />}
+            />
             <Route path="/experiments/:id" element={<ExperimentDetailPage />} />
             <Route
               path="/experiments/:id/edit"
@@ -76,10 +84,16 @@ function App() {
               element={<AddDateLogPage />}
             />
             <Route
+              path="/experiments/:id/logs/photo"
+              element={<QuickPhotoLogPage />}
+            />
+            <Route
               path="/experiments/:id/logs/:logId/edit"
               element={<EditDateLogPage />}
             />
+            <Route path="/stats" element={<StatsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/bin" element={<BinPage />} />
             <Route path="/fertilizer-log" element={<FertilizerLogPage />} />
             <Route path="/pest-control" element={<PestControlPage />} />
             <Route path="/tips" element={<TipsPage />} />

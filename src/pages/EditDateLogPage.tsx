@@ -31,7 +31,12 @@ export default function EditDateLogPage() {
       const [logRow, expRow, allLogs] = await Promise.all([
         navState?.log
           ? Promise.resolve({ data: navState.log, error: null })
-          : supabase.from('date_logs').select().eq('id', logId).maybeSingle(),
+          : supabase
+              .from('date_logs')
+              .select()
+              .eq('id', logId)
+              .is('deleted_at', null)
+              .maybeSingle(),
         navState?.experiment?.plant_count != null
           ? Promise.resolve({
               data: { plant_count: navState.experiment.plant_count },
@@ -41,8 +46,13 @@ export default function EditDateLogPage() {
               .from('experiments')
               .select('plant_count')
               .eq('id', id)
+              .is('deleted_at', null)
               .maybeSingle(),
-        supabase.from('date_logs').select('id, deaths_count').eq('experiment_id', id),
+        supabase
+          .from('date_logs')
+          .select('id, deaths_count')
+          .eq('experiment_id', id)
+          .is('deleted_at', null),
       ])
       if (cancelled) return
       if (logRow.error) setError(logRow.error.message)

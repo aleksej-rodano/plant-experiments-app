@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  CalendarPlus,
   CheckCircle2,
   ChevronRight,
   FlaskConical,
@@ -7,15 +8,28 @@ import {
   MapPin,
   Pencil,
   Plus,
+  Sheet,
   Sprout,
   Tag,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import CareBanner from '../components/CareBanner'
+import ComparisonChart from '../components/ComparisonChart'
+import WinnerCallout from '../components/WinnerCallout'
 import { supabase } from '../lib/supabase'
-import { formatRate, survivorCount } from '../lib/utils/survival'
-import type { Experiment, Folder } from '../types/database'
+import { binFolder } from '../lib/utils/bin'
+import { today } from '../lib/utils/care'
+import { exportFolderToCSV } from '../lib/utils/csvExport'
+import { summariseAll } from '../lib/utils/insights'
+import {
+  SURVIVAL_TEXT_CLASS,
+  SURVIVAL_TILE_CLASS,
+  formatRate,
+  survivalLevel,
+} from '../lib/utils/survival'
+import type { DateLog, Experiment, Folder } from '../types/database'
 
 function BackLink() {
   return (
@@ -40,7 +54,7 @@ export default function FolderDetailPage() {
 
   const [folder, setFolder] = useState<Folder | null>(seeded.current)
   const [experiments, setExperiments] = useState<Experiment[]>([])
-  const [deathsByExp, setDeathsByExp] = useState<Record<string, number>>({})
+  const [logs, setLogs] = useState<DateLog[]>([])
   const [loading, setLoading] = useState(!seeded.current)
   const [expLoading, setExpLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -48,15 +62,19 @@ export default function FolderDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  const summaries = useMemo(
+    () => summariseAll(experiments, logs),
+    [experiments, logs],
+  )
+  const summaryFor = (id: string) => summaries.find((s) => s.experiment.id === id)
+
   const totalPlants = experiments.reduce(
     (sum, e) => sum + (e.plant_count ?? 0),
     0,
   )
-  const aliveFor = (exp: Experiment) =>
-    survivorCount(exp.plant_count, deathsByExp[exp.id] ?? 0)
-  const totalAlive = experiments.reduce((sum, e) => sum + aliveFor(e), 0)
-  const folderRate =
-    totalPlants > 0 ? formatRate(totalAlive / totalPlants) : '—'
+  const totalAlive = summaries.reduce((sum, s) => sum + s.alive, 0)
+  const folderRateValue = totalPlants > 0 ? totalAlive / totalPlants : null
+  const folderRate = folderRateValue == null ? '—' : formatRate(folderRateValue)
 
   const load = useCallback(
     async (opts?: { background?: boolean }) => {
@@ -73,12 +91,14 @@ export default function FolderDetailPage() {
             .from('folders')
             .select()
             .eq('id', folderId)
+            .is('deleted_at', null)
             .abortSignal(controller.signal)
             .maybeSingle(),
           supabase
             .from('experiments')
             .select()
             .eq('folder_id', folderId)
+            .is('deleted_at', null)
             .order('created_at', { ascending: false })
             .abortSignal(controller.signal),
         ])
@@ -89,22 +109,21 @@ export default function FolderDetailPage() {
         setExperiments(exps)
 
         if (exps.length > 0) {
+          // Full rows (not just deaths): the comparison charts, the verdict, and
+          // the CSV export all read from this one fetch.
           const { data: logRows } = await supabase
             .from('date_logs')
-            .select('experiment_id, deaths_count')
+            .select()
             .in(
               'experiment_id',
               exps.map((e) => e.id),
             )
+            .is('deleted_at', null)
+            .order('log_date', { ascending: true })
             .abortSignal(controller.signal)
-          const tally: Record<string, number> = {}
-          for (const row of logRows ?? []) {
-            tally[row.experiment_id] =
-              (tally[row.experiment_id] ?? 0) + (row.deaths_count ?? 0)
-          }
-          setDeathsByExp(tally)
+          setLogs(logRows ?? [])
         } else {
-          setDeathsByExp({})
+          setLogs([])
         }
       } catch (e) {
         if (!opts?.background) {
@@ -138,18 +157,36 @@ export default function FolderDetailPage() {
     return () => clearTimeout(t)
   }, [location.state, navigate])
 
+  async function handleMarkCareDone() {
+    if (!folderId) return
+    const { data, error } = await supabase
+      .from('folders')
+      .update({ care_last_done_on: today() })
+      .eq('id', folderId)
+      .select()
+      .maybeSingle()
+    if (error) {
+      setError(error.message)
+      return
+    }
+    if (data) setFolder(data)
+    setToast('Marked done.')
+    setTimeout(() => setToast(null), 3000)
+  }
+
   async function handleDelete() {
     if (!folderId) return
     setDeleting(true)
-    const { error } = await supabase.from('folders').delete().eq('id', folderId)
-    if (error) {
-      setError(error.message)
+    try {
+      await binFolder(folderId)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete the folder.')
       setDeleting(false)
       return
     }
     navigate('/experiments', {
       replace: true,
-      state: { toast: 'Folder deleted.' },
+      state: { toast: 'Folder moved to the bin.' },
     })
   }
 
@@ -201,6 +238,8 @@ export default function FolderDetailPage() {
         </div>
       )}
 
+      <CareBanner folder={folder} onMarkDone={handleMarkCareDone} />
+
       <div className="mt-3 flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-surface-variant">
         {folder.cover_image_url ? (
           <img
@@ -225,6 +264,28 @@ export default function FolderDetailPage() {
             <Pencil className="size-4" />
             <span className="hidden sm:inline">Edit</span>
           </Link>
+          {experiments.length > 0 && (
+            <button
+              type="button"
+              onClick={() => exportFolderToCSV(folder, experiments, logs)}
+              title="Export every experiment in this folder as a spreadsheet"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+            >
+              <Sheet className="size-4" />
+              <span className="hidden sm:inline">CSV</span>
+            </button>
+          )}
+          {experiments.length > 0 && (
+            <Link
+              to={`/folders/${folder.id}/logs/new`}
+              state={{ folder, experiments }}
+              title="Add one log entry to every experiment in this folder"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+            >
+              <CalendarPlus className="size-4" />
+              <span className="hidden sm:inline">Log all</span>
+            </Link>
+          )}
           <Link
             to={`/folders/${folder.id}/experiments/new`}
             state={{ folder }}
@@ -237,7 +298,11 @@ export default function FolderDetailPage() {
       </div>
 
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
-        <div className="rounded-lg bg-primary-container px-3 py-2 text-on-primary-container">
+        <div
+          className={`rounded-lg px-3 py-2 ${
+            SURVIVAL_TILE_CLASS[survivalLevel(folderRateValue)]
+          }`}
+        >
           <dt className="flex items-center gap-1 text-xs">
             <Sprout className="size-3.5" />
             Surviving plants
@@ -291,6 +356,17 @@ export default function FolderDetailPage() {
         </p>
       )}
 
+      <WinnerCallout summaries={summaries} />
+
+      {experiments.length >= 2 && logs.length > 0 && (
+        <>
+          <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">
+            Comparison
+          </h2>
+          <ComparisonChart experiments={experiments} logs={logs} />
+        </>
+      )}
+
       <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">
         Experiments
       </h2>
@@ -329,7 +405,18 @@ export default function FolderDetailPage() {
                     {exp.title}
                   </span>
                   <span className="block truncate text-sm text-on-surface-variant">
-                    {aliveFor(exp)}/{exp.plant_count ?? 0} alive
+                    <span
+                      className={
+                        SURVIVAL_TEXT_CLASS[
+                          survivalLevel(summaryFor(exp.id)?.rate ?? null)
+                        ]
+                      }
+                    >
+                      {summaryFor(exp.id)?.alive ?? 0}/{exp.plant_count ?? 0}
+                    </span>{' '}
+                    alive
+                    {summaryFor(exp.id)?.daysToRoot != null &&
+                      ` · rooted in ${summaryFor(exp.id)?.daysToRoot}d`}
                     {exp.status !== 'ongoing' ? ` · ${exp.status}` : ''}
                     {exp.notes ? ` · ${exp.notes}` : ''}
                   </span>
@@ -345,7 +432,7 @@ export default function FolderDetailPage() {
         {confirmingDelete ? (
           <div className="flex items-center gap-2">
             <span className="flex-1 text-sm text-on-surface-variant">
-              Delete this folder, its experiments and all their logs?
+              Move this folder, its experiments and all their logs to the bin?
             </span>
             <button
               type="button"

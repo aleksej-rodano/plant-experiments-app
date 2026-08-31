@@ -1,6 +1,8 @@
-import { FolderOpen, Loader2, MapPin, Trash2 } from 'lucide-react'
+import { AlarmClock, FolderOpen, Loader2, MapPin, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { CARE_TILE_CLASS, careStatus } from '../lib/utils/care'
+import { SURVIVAL_TEXT_CLASS, survivalLevel } from '../lib/utils/survival'
 import type { Folder } from '../types/database'
 
 interface Props {
@@ -20,6 +22,7 @@ export default function FolderCard({
 }: Props) {
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const care = careStatus(folder)
 
   async function handleDelete() {
     setDeleting(true)
@@ -54,14 +57,45 @@ export default function FolderCard({
           <h2 className="line-clamp-2 font-medium text-on-surface">
             {folder.title}
           </h2>
-          {experimentCount != null && (
-            <p className="text-sm text-on-surface-variant">
-              {experimentCount} experiment{experimentCount === 1 ? '' : 's'}
-              {plantTotal != null &&
-                (aliveTotal != null
-                  ? ` · ${aliveTotal}/${plantTotal} alive`
-                  : ` · ${plantTotal} plant${plantTotal === 1 ? '' : 's'}`)}
+          {/* Only surface a chore that actually needs doing — an upcoming one is
+              just noise on a grid of cards. */}
+          {care && care.state !== 'upcoming' && (
+            <p
+              className={`flex items-center gap-1 self-start rounded-full px-2 py-0.5 text-xs font-medium ${
+                CARE_TILE_CLASS[care.state]
+              }`}
+            >
+              <AlarmClock className="size-3 shrink-0" />
+              {care.label} · {care.text.toLowerCase()}
             </p>
+          )}
+          {experimentCount != null && (
+            <div className="text-sm text-on-surface-variant">
+              <p>
+                Experiments: {experimentCount}
+              </p>
+              {plantTotal != null &&
+                (aliveTotal != null ? (
+                  <p>
+                    <span
+                      className={
+                        SURVIVAL_TEXT_CLASS[
+                          survivalLevel(
+                            plantTotal > 0 ? aliveTotal / plantTotal : null,
+                          )
+                        ]
+                      }
+                    >
+                      {aliveTotal}/{plantTotal}
+                    </span>{' '}
+                    plants alive
+                  </p>
+                ) : (
+                  <p>
+                    {plantTotal} plant{plantTotal === 1 ? '' : 's'}
+                  </p>
+                ))}
+            </div>
           )}
           {folder.origin && (
             <p className="mt-auto flex items-center gap-1 text-xs text-on-surface-variant">

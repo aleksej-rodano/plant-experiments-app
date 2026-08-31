@@ -255,10 +255,24 @@ export default function DateLogForm({
             <input
               type="number"
               min={0}
+              max={aliveBefore ?? undefined}
               step={1}
               inputMode="numeric"
               value={deaths}
-              onChange={(e) => setDeaths(e.target.value)}
+              onChange={(e) => {
+                const raw = e.target.value
+                if (raw === '') {
+                  setDeaths('')
+                  return
+                }
+                const n = Number(raw)
+                // Never let this entry record more deaths than plants left alive.
+                if (aliveBefore != null && Number.isFinite(n) && n > aliveBefore) {
+                  setDeaths(String(aliveBefore))
+                } else {
+                  setDeaths(raw)
+                }
+              }}
               className={inputClass}
             />
             {aliveBefore != null && (

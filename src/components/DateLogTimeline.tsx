@@ -2,6 +2,7 @@ import { Loader2, Pencil, Ruler, Skull, Sprout, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { binRow } from '../lib/utils/bin'
 import type { DateLog, Experiment, Folder } from '../types/database'
 
 interface Props {
@@ -45,6 +46,7 @@ export default function DateLogTimeline({
         .from('date_logs')
         .select()
         .eq('experiment_id', experimentId)
+        .is('deleted_at', null)
         .order('log_date', { ascending: false })
         .order('created_at', { ascending: false })
         .abortSignal(controller.signal)
@@ -73,9 +75,10 @@ export default function DateLogTimeline({
 
   async function handleDelete(logId: string) {
     setDeletingId(logId)
-    const { error } = await supabase.from('date_logs').delete().eq('id', logId)
-    if (error) {
-      setError(error.message)
+    try {
+      await binRow('date_log', logId)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete the entry.')
       setDeletingId(null)
       return
     }
@@ -148,9 +151,12 @@ export default function DateLogTimeline({
             </div>
           </div>
 
-          <p className="mt-1 whitespace-pre-wrap text-sm text-on-surface">
-            {log.status_details}
-          </p>
+          {/* Photo-only entries save an empty note — don't leave a blank line. */}
+          {log.status_details?.trim() && (
+            <p className="mt-1 whitespace-pre-wrap text-sm text-on-surface">
+              {log.status_details}
+            </p>
+          )}
 
           {(log.root_length_mm != null ||
             log.new_leaves != null ||
@@ -189,7 +195,7 @@ export default function DateLogTimeline({
           {confirmingId === log.id && (
             <div className="mt-2 flex items-center gap-2 rounded-lg bg-surface-container px-3 py-2">
               <span className="flex-1 text-xs text-on-surface-variant">
-                Delete this log entry?
+                Move this log entry to the bin?
               </span>
               <button
                 type="button"

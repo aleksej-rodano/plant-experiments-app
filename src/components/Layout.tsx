@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   Bug,
   Droplets,
   Lightbulb,
@@ -7,11 +8,18 @@ import {
   Settings,
   Sprout,
 } from 'lucide-react'
+import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
+import { purgeExpired } from '../lib/utils/bin'
+
+// Module scope, not a ref: the sweep should run once per page load, not once per
+// mount (React StrictMode mounts twice in development).
+let sweptThisSession = false
 
 const NAV = [
   { to: '/experiments', label: 'Experiments', icon: Sprout },
+  { to: '/stats', label: 'Stats', icon: BarChart3 },
   { to: '/fertilizer-log', label: 'Fertilizer Log', icon: Droplets },
   { to: '/pest-control', label: 'Pest Control', icon: Bug },
   { to: '/tips', label: 'Tips', icon: Lightbulb },
@@ -29,6 +37,16 @@ function navItemClass(isActive: boolean) {
 
 export default function Layout() {
   const { user, signOut } = useAuth()
+
+  // Clear out anything past its 30-day restore window, photos included. Silent
+  // by design: it's housekeeping, and a failure just means it retries next load.
+  useEffect(() => {
+    if (!user || sweptThisSession) return
+    sweptThisSession = true
+    void purgeExpired().catch(() => {
+      sweptThisSession = false
+    })
+  }, [user])
 
   return (
     <div className="flex min-h-full flex-col bg-background text-on-background">

@@ -22,11 +22,35 @@ The app is organised in three levels:
    look that day, with an optional photo. These stack up into a timeline so you
    can see progress at a glance.
 
-From an experiment you can tap **Export PDF** to get a shareable report with the
-batch details, notes, and every log entry with its photos.
+Three ways to add a log entry, depending on how much you want to type:
+
+- **Add Log Entry** — the full form: notes, root length, new leaves, plants lost
+  and the cause, photo.
+- **Photo** — the quick path. Take a picture, save. The note is optional.
+- **Log all** (from a folder) — one entry written to every experiment in the
+  folder at once, for when you change the water or fertilize the whole batch. It
+  still shows up in each experiment's own timeline.
+
+From an experiment you can tap **Export PDF** for a shareable report with the
+batch details, notes, and every log entry with its photos, or **CSV** to get the
+same log entries as a spreadsheet. A folder has its own CSV export covering all
+of its experiments in one sheet.
+
+Each folder can carry a **recurring reminder** — a task like "Change water" every
+few days. The folder shows whether it's due or overdue with a **Mark done**
+button, and folders needing attention are badged in the folder list.
+
+Comparing experiments is the point of the app, so a folder with more than one
+experiment also shows:
+
+- **Charts** overlaying every experiment on shared axes — survival, root length,
+  and new leaves — so you can see which treatment is pulling ahead.
+- **A verdict line** naming the best treatment so far and the fastest to root.
 
 Other tabs:
 
+- **Stats** — everything across every folder: overall survival, median days to
+  root, and survival broken down by treatment, folder, and origin.
 - **Fertilizer Log** — a simple running list of the dates you fed your plants,
   plus a seasonal feeding-frequency guide.
 - **Pest Control** — a reference of common pests with quick treatment steps and a
@@ -47,11 +71,23 @@ The web app is functional and in active use. Working today:
   change or a round of fertilizer) to every experiment in that folder at once.
   Each experiment still gets its own entry, so it shows up in every individual
   timeline.
+- **Quick photo logging** — one tap, take a picture, done; the note is optional
+- **Comparison charts and a verdict** on which treatment is winning inside a
+  folder, including how many days each took to root
+- **Stats** across every folder — survival by treatment, folder, and origin
+- **Recurring reminders** per folder, with overdue badges on the folder list
 - Editing a folder's details, description, and cover image
-- PDF export of an experiment
+- PDF and CSV export, per experiment and per folder
+- **Bin** — deleting anything moves it to a bin you can restore from for 30 days,
+  after which it and its photos are removed permanently
 - Fertilizer log, pest reference, tips, and notes
 
 Photos are automatically shrunk before upload so saving stays fast.
+
+Database changes live in `db/` as dated SQL files. They are idempotent and
+transaction-wrapped, and you run them yourself in the Supabase SQL editor — the
+app expects the columns they add, so a new one has to be run before the features
+in that release will work.
 
 ## Future steps
 

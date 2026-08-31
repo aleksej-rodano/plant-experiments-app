@@ -2,6 +2,7 @@ import { ImagePlus, Loader2, NotebookPen, Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { binRow } from '../lib/utils/bin'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Note } from '../types/database'
 
@@ -39,6 +40,7 @@ export default function NotesPage() {
       const { data, error } = await supabase
         .from('notes')
         .select()
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
         .abortSignal(controller.signal)
       if (error) throw error
@@ -118,9 +120,10 @@ export default function NotesPage() {
   }
 
   async function handleDelete(id: string) {
-    const { error } = await supabase.from('notes').delete().eq('id', id)
-    if (error) {
-      setError(error.message)
+    try {
+      await binRow('note', id)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete the note.')
       return
     }
     setNotes((prev) => prev.filter((n) => n.id !== id))

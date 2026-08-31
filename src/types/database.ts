@@ -3,6 +3,14 @@
 
 export type ExperimentStatus = 'ongoing' | 'succeeded' | 'failed'
 
+// Soft-delete bookkeeping (see db/2026-08-31_soft_delete_bin.sql) is repeated
+// inline on every binnable table below rather than mixed in as an intersection:
+// supabase-js infers its query result types from these shapes, and an
+// intersection makes that inference collapse to `never`.
+//   deleted_at       null = live
+//   delete_batch_id  groups everything removed by one delete action
+//   deleted_root     true on the row the user actually deleted
+
 export interface Database {
   public: {
     Tables: {
@@ -16,8 +24,14 @@ export interface Database {
           initial_price: number | null
           notes: string | null
           cover_image_url: string | null
+          care_task_label: string | null
+          care_interval_days: number | null
+          care_last_done_on: string | null
           created_at: string
           updated_at: string
+          deleted_at: string | null
+          delete_batch_id: string | null
+          deleted_root: boolean
         }
         Insert: {
           id?: string
@@ -28,8 +42,14 @@ export interface Database {
           initial_price?: number | null
           notes?: string | null
           cover_image_url?: string | null
+          care_task_label?: string | null
+          care_interval_days?: number | null
+          care_last_done_on?: string | null
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
+          delete_batch_id?: string | null
+          deleted_root?: boolean
         }
         Update: Partial<Database['public']['Tables']['folders']['Insert']>
         Relationships: []
@@ -49,6 +69,9 @@ export interface Database {
           status: ExperimentStatus
           created_at: string
           updated_at: string
+          deleted_at: string | null
+          delete_batch_id: string | null
+          deleted_root: boolean
         }
         Insert: {
           id?: string
@@ -64,6 +87,9 @@ export interface Database {
           status?: ExperimentStatus
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
+          delete_batch_id?: string | null
+          deleted_root?: boolean
         }
         Update: Partial<Database['public']['Tables']['experiments']['Insert']>
         Relationships: []
@@ -81,6 +107,9 @@ export interface Database {
           death_cause: string | null
           created_at: string
           updated_at: string
+          deleted_at: string | null
+          delete_batch_id: string | null
+          deleted_root: boolean
         }
         Insert: {
           id?: string
@@ -94,6 +123,9 @@ export interface Database {
           death_cause?: string | null
           created_at?: string
           updated_at?: string
+          deleted_at?: string | null
+          delete_batch_id?: string | null
+          deleted_root?: boolean
         }
         Update: Partial<Database['public']['Tables']['date_logs']['Insert']>
         Relationships: []
@@ -121,12 +153,16 @@ export interface Database {
           id: string
           title: string
           content: string
+          category: string | null
+          subcategory: string | null
           created_at: string
         }
         Insert: {
           id?: string
           title: string
           content: string
+          category?: string | null
+          subcategory?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['tips']['Insert']>
@@ -139,6 +175,9 @@ export interface Database {
           body: string
           image_url: string | null
           created_at: string
+          deleted_at: string | null
+          delete_batch_id: string | null
+          deleted_root: boolean
         }
         Insert: {
           id?: string
@@ -146,6 +185,9 @@ export interface Database {
           body: string
           image_url?: string | null
           created_at?: string
+          deleted_at?: string | null
+          delete_batch_id?: string | null
+          deleted_root?: boolean
         }
         Update: Partial<Database['public']['Tables']['notes']['Insert']>
         Relationships: []

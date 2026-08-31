@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { CARE_TASK_SUGGESTIONS } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Database, Folder } from '../types/database'
 
@@ -27,6 +28,10 @@ export default function EditFolderPage() {
     seeded?.initial_price != null ? String(seeded.initial_price) : '',
   )
   const [notes, setNotes] = useState(seeded?.notes ?? '')
+  const [careTask, setCareTask] = useState(seeded?.care_task_label ?? '')
+  const [careInterval, setCareInterval] = useState(
+    seeded?.care_interval_days != null ? String(seeded.care_interval_days) : '',
+  )
   // Image state: `image` is a newly picked file; `currentUrl` is what's stored;
   // clearing sets `currentUrl` to '' so we know to null it out on save.
   const [image, setImage] = useState<File | null>(null)
@@ -49,6 +54,7 @@ export default function EditFolderPage() {
         .from('folders')
         .select()
         .eq('id', folderId)
+        .is('deleted_at', null)
         .maybeSingle()
       if (cancelled) return
       if (error) {
@@ -63,6 +69,10 @@ export default function EditFolderPage() {
           data.initial_price != null ? String(data.initial_price) : '',
         )
         setNotes(data.notes ?? '')
+        setCareTask(data.care_task_label ?? '')
+        setCareInterval(
+          data.care_interval_days != null ? String(data.care_interval_days) : '',
+        )
         setCurrentUrl(data.cover_image_url ?? '')
       }
       setLoading(false)
@@ -104,6 +114,13 @@ export default function EditFolderPage() {
     if (!title.trim()) next.title = 'Title is required.'
     if (initialPrice.trim() && Number(initialPrice) < 0)
       next.initialPrice = 'Price cannot be negative.'
+    if (careInterval.trim()) {
+      const n = Number(careInterval)
+      if (!Number.isInteger(n) || n < 1)
+        next.careInterval = 'Enter a whole number of days, 1 or more.'
+      else if (!careTask.trim())
+        next.careTask = 'Name the task you want reminding about.'
+    }
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -132,6 +149,9 @@ export default function EditFolderPage() {
         initial_price: initialPrice.trim() ? Number(initialPrice) : null,
         notes: notes.trim() || null,
         cover_image_url: coverUrl,
+        // Clearing the interval turns the reminder off entirely.
+        care_task_label: careInterval.trim() ? careTask.trim() || null : null,
+        care_interval_days: careInterval.trim() ? Number(careInterval) : null,
       }
       const { error } = await supabase
         .from('folders')
@@ -239,6 +259,53 @@ export default function EditFolderPage() {
             className={inputClass}
           />
         </label>
+
+        <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
+          <legend className="px-1 text-sm text-on-surface-variant">
+            Recurring reminder
+          </legend>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+              Task
+              <input
+                type="text"
+                list="care-task-suggestions"
+                value={careTask}
+                onChange={(e) => setCareTask(e.target.value)}
+                placeholder="e.g. Change water"
+                className={inputClass}
+              />
+              {errors.careTask && (
+                <span className="text-xs text-error">{errors.careTask}</span>
+              )}
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+              Every … days
+              <input
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                value={careInterval}
+                onChange={(e) => setCareInterval(e.target.value)}
+                placeholder="3"
+                className={inputClass}
+              />
+              {errors.careInterval && (
+                <span className="text-xs text-error">{errors.careInterval}</span>
+              )}
+            </label>
+          </div>
+          <datalist id="care-task-suggestions">
+            {CARE_TASK_SUGGESTIONS.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
+          <p className="text-xs text-on-surface-variant">
+            Leave the days blank to turn the reminder off.
+          </p>
+        </fieldset>
 
         <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
           Cover image

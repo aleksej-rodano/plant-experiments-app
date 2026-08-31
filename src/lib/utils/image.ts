@@ -69,3 +69,31 @@ export async function uploadImage(file: File, userId: string): Promise<string> {
   if (error) throw error
   return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
 }
+
+/**
+ * The in-bucket path from a public URL, or null if the URL doesn't point at our
+ * bucket (an external image, or a link left over from an earlier setup).
+ */
+export function storagePathFromUrl(url: string): string | null {
+  const marker = `/${BUCKET}/`
+  const at = url.indexOf(marker)
+  if (at === -1) return null
+  const path = url.slice(at + marker.length).split('?')[0]
+  return path ? decodeURIComponent(path) : null
+}
+
+/**
+ * Delete uploaded images by public URL. Best effort: a failure here leaves an
+ * orphaned file taking up space, which is not worth failing the caller over.
+ */
+export async function removeStoredImages(urls: string[]): Promise<void> {
+  const paths = urls
+    .map(storagePathFromUrl)
+    .filter((p): p is string => p !== null)
+  if (paths.length === 0) return
+  try {
+    await supabase.storage.from(BUCKET).remove(paths)
+  } catch {
+    // ignored on purpose
+  }
+}

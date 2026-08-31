@@ -1,6 +1,8 @@
-import { CheckCircle2, Download, Loader2 } from 'lucide-react'
+import { CheckCircle2, ChevronRight, Download, Loader2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { buildBackup, downloadJson } from '../lib/utils/backup'
+import { RETENTION_DAYS } from '../lib/utils/bin'
 
 export default function SettingsPage() {
   const [busy, setBusy] = useState(false)
@@ -31,6 +33,21 @@ export default function SettingsPage() {
   return (
     <section className="mx-auto max-w-lg">
       <h1 className="text-xl font-medium text-on-surface">Settings</h1>
+
+      <Link
+        to="/bin"
+        className="mt-4 flex items-center gap-3 rounded-lg bg-surface-container p-4 hover:opacity-90"
+      >
+        <Trash2 className="size-5 shrink-0 text-on-surface-variant" />
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-on-surface">Bin</span>
+          <span className="block text-sm text-on-surface-variant">
+            Restore deleted folders, experiments, log entries and notes for up to{' '}
+            {RETENTION_DAYS} days.
+          </span>
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-on-surface-variant" />
+      </Link>
 
       <div className="mt-4 rounded-lg bg-surface-container p-4">
         <h2 className="font-medium text-on-surface">Back up your data</h2>

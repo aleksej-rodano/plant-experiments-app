@@ -17,6 +17,10 @@ export interface BackupFile {
  * Pull every row the signed-in user owns. Row-level security already scopes each
  * table to the current user (date_logs via its parent experiment), so a plain
  * select returns only their data.
+ *
+ * Binned rows are included on purpose: a backup taken today shouldn't silently
+ * drop something deleted yesterday that's still inside its restore window. The
+ * soft-delete columns come along, so the bin state round-trips intact.
  */
 export async function buildBackup(): Promise<BackupFile> {
   const [folders, experiments, dateLogs, feedingLogs, notes] = await Promise.all(

@@ -1,10 +1,12 @@
 import {
   ArrowLeft,
+  Camera,
   CheckCircle2,
   FileDown,
   Loader2,
   Pencil,
   Plus,
+  Sheet,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -12,9 +14,13 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DateLogTimeline from '../components/DateLogTimeline'
 import MeasurementsChart from '../components/MeasurementsChart'
 import { supabase } from '../lib/supabase'
+import { binExperiment } from '../lib/utils/bin'
+import { exportExperimentToCSV } from '../lib/utils/csvExport'
 import {
+  SURVIVAL_TEXT_CLASS,
   formatRate,
   successRate,
+  survivalLevel,
   survivorCount,
   totalDeaths,
 } from '../lib/utils/survival'
@@ -73,7 +79,7 @@ export default function ExperimentDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
+  const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null)
 
   const folderId = experiment?.folder_id ?? folder?.id ?? null
   const backTo = folderId ? `/folders/${folderId}` : '/experiments'
@@ -106,6 +112,7 @@ export default function ExperimentDetailPage() {
           .from('experiments')
           .select()
           .eq('id', id)
+          .is('deleted_at', null)
           .abortSignal(controller.signal)
           .maybeSingle()
         if (error) throw error
@@ -144,6 +151,7 @@ export default function ExperimentDetailPage() {
         .from('folders')
         .select()
         .eq('id', fid)
+        .is('deleted_at', null)
         .maybeSingle()
       if (!cancelled && data) setFolder(data)
     })()
@@ -163,40 +171,53 @@ export default function ExperimentDetailPage() {
 
   const backLabel = folder?.title ?? (folderId ? 'Folder' : 'Folders')
 
-  async function handleExport() {
+  async function handleExport(format: 'pdf' | 'csv') {
     if (!experiment) return
-    setExporting(true)
+    setExporting(format)
     setError(null)
     try {
       const { data, error } = await supabase
         .from('date_logs')
         .select()
         .eq('experiment_id', experiment.id)
+        .is('deleted_at', null)
         .order('log_date', { ascending: true })
         .order('created_at', { ascending: true })
       if (error) throw new Error(error.message)
-      // Lazy-loaded: keeps jspdf + html2canvas (~1 MB) out of the initial bundle.
-      const { exportExperimentToPDF } = await import('../lib/utils/pdfExport')
-      await exportExperimentToPDF(experiment, data ?? [], folder)
+
+      if (format === 'csv') {
+        exportExperimentToCSV(experiment, data ?? [], folder)
+      } else {
+        // Lazy-loaded: keeps jspdf + html2canvas (~1 MB) out of the initial bundle.
+        const { exportExperimentToPDF } = await import('../lib/utils/pdfExport')
+        await exportExperimentToPDF(experiment, data ?? [], folder)
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'PDF export failed.')
+      setError(
+        e instanceof Error
+          ? e.message
+          : `${format.toUpperCase()} export failed.`,
+      )
     } finally {
-      setExporting(false)
+      setExporting(null)
     }
   }
 
   async function handleDelete() {
     if (!id) return
     setDeleting(true)
-    const { error } = await supabase.from('experiments').delete().eq('id', id)
-    if (error) {
-      setError(error.message)
+    try {
+      await binExperiment(id)
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : 'Failed to delete the experiment.',
+      )
       setDeleting(false)
       return
     }
     navigate(backTo, {
       replace: true,
-      state: { toast: 'Experiment deleted.' },
+      state: { toast: 'Experiment moved to the bin.' },
     })
   }
 
@@ -270,7 +291,11 @@ export default function ExperimentDetailPage() {
             {experiment.started_on && stats.initial != null && ' · '}
             {stats.initial != null && (
               <>
-                <span className="font-medium text-on-surface">
+                <span
+                  className={`font-medium ${
+                    SURVIVAL_TEXT_CLASS[survivalLevel(stats.rate)]
+                  }`}
+                >
                   {stats.alive}/{stats.initial}
                 </span>{' '}
                 alive ({formatRate(stats.rate)})
@@ -289,19 +314,44 @@ export default function ExperimentDetailPage() {
           </Link>
           <button
             type="button"
-            onClick={() => void handleExport()}
-            disabled={exporting}
+            onClick={() => void handleExport('pdf')}
+            disabled={exporting != null}
             className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
           >
-            {exporting ? (
+            {exporting === 'pdf' ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
               <FileDown className="size-4" />
             )}
             <span className="hidden sm:inline">
-              {exporting ? 'Exporting…' : 'Export PDF'}
+              {exporting === 'pdf' ? 'Exporting…' : 'PDF'}
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => void handleExport('csv')}
+            disabled={exporting != null}
+            title="Export log entries as a spreadsheet"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
+          >
+            {exporting === 'csv' ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sheet className="size-4" />
+            )}
+            <span className="hidden sm:inline">
+              {exporting === 'csv' ? 'Exporting…' : 'CSV'}
+            </span>
+          </button>
+          <Link
+            to={`/experiments/${experiment.id}/logs/photo`}
+            state={{ experiment, folder }}
+            title="Log a photo — note optional"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+          >
+            <Camera className="size-4" />
+            <span className="hidden sm:inline">Photo</span>
+          </Link>
           <Link
             to={`/experiments/${experiment.id}/logs/new`}
             state={{ experiment, folder }}
@@ -331,7 +381,10 @@ export default function ExperimentDetailPage() {
       )}
 
       {timelineLogs.some(
-        (l) => l.root_length_mm != null || l.new_leaves != null,
+        (l) =>
+          l.root_length_mm != null ||
+          l.new_leaves != null ||
+          (l.deaths_count ?? 0) > 0,
       ) && (
         <div className="mt-4">
           <MeasurementsChart logs={timelineLogs} />
@@ -350,7 +403,7 @@ export default function ExperimentDetailPage() {
         {confirmingDelete ? (
           <div className="flex items-center gap-2">
             <span className="flex-1 text-sm text-on-surface-variant">
-              Delete this experiment and its logs?
+              Move this experiment and its logs to the bin?
             </span>
             <button
               type="button"
