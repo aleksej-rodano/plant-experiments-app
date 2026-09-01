@@ -31,6 +31,10 @@ Three ways to add a log entry, depending on how much you want to type:
   folder at once, for when you change the water or fertilize the whole batch. It
   still shows up in each experiment's own timeline.
 
+After picking or taking a photo, tap **Circle** to drop an adjustable red ring on
+it — drag to position, use the slider to size it — and it's burned into the image
+before upload, so the marked-up photo is what lands in the log.
+
 From an experiment you can tap **Export PDF** for a shareable report with the
 batch details, notes, and every log entry with its photos, or **CSV** to get the
 same log entries as a spreadsheet. A folder has its own CSV export covering all

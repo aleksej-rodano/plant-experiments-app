@@ -1,6 +1,7 @@
-import { ArrowLeft, Camera, Loader2, X } from 'lucide-react'
+import { ArrowLeft, Camera, Circle, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import PhotoAnnotator from '../components/PhotoAnnotator'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
@@ -26,6 +27,7 @@ export default function QuickPhotoLogPage() {
   } | null
 
   const [image, setImage] = useState<File | null>(null)
+  const [marking, setMarking] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [note, setNote] = useState('')
   const [logDate, setLogDate] = useState(today())
@@ -147,6 +149,14 @@ export default function QuickPhotoLogPage() {
               <div className="absolute right-2 top-2 flex gap-1.5">
                 <button
                   type="button"
+                  onClick={() => setMarking(true)}
+                  className="flex items-center gap-1 rounded-lg bg-surface/80 px-2 py-1.5 text-xs font-medium text-on-surface-variant backdrop-blur hover:bg-surface"
+                >
+                  <Circle className="size-3.5 text-error" />
+                  Circle
+                </button>
+                <button
+                  type="button"
                   onClick={() => fileRef.current?.click()}
                   className="rounded-lg bg-surface/80 px-2 py-1.5 text-xs font-medium text-on-surface-variant backdrop-blur hover:bg-surface"
                 >
@@ -233,6 +243,17 @@ export default function QuickPhotoLogPage() {
             .
           </p>
         </form>
+      )}
+
+      {marking && image && (
+        <PhotoAnnotator
+          file={image}
+          onCancel={() => setMarking(false)}
+          onDone={(marked) => {
+            setImage(marked)
+            setMarking(false)
+          }}
+        />
       )}
     </section>
   )

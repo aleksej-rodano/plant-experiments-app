@@ -1,6 +1,7 @@
-import { Camera, ImagePlus, Loader2, X } from 'lucide-react'
+import { Camera, Circle, ImagePlus, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import PhotoAnnotator from './PhotoAnnotator'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
@@ -60,6 +61,7 @@ export default function DateLogForm({
   const [deathCause, setDeathCause] = useState(initial?.death_cause ?? '')
 
   const [image, setImage] = useState<File | null>(null)
+  const [marking, setMarking] = useState(false)
   const [currentUrl, setCurrentUrl] = useState(initial?.image_url ?? '')
   const [newPreviewUrl, setNewPreviewUrl] = useState<string | null>(null)
   // Two separate inputs: one forces the camera, one opens the file/gallery picker.
@@ -335,6 +337,16 @@ export default function DateLogForm({
               className="aspect-video w-full object-cover"
             />
             <div className="absolute right-2 top-2 flex gap-1.5">
+              {image && (
+                <button
+                  type="button"
+                  onClick={() => setMarking(true)}
+                  className="flex items-center gap-1 rounded-lg bg-surface/80 px-2 py-1.5 text-xs font-medium text-on-surface-variant backdrop-blur hover:bg-surface"
+                >
+                  <Circle className="size-3.5 text-error" />
+                  Circle
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => cameraRef.current?.click()}
@@ -383,6 +395,17 @@ export default function DateLogForm({
           <span className="text-xs text-error">{errors.image}</span>
         )}
       </div>
+
+      {marking && image && (
+        <PhotoAnnotator
+          file={image}
+          onCancel={() => setMarking(false)}
+          onDone={(marked) => {
+            setImage(marked)
+            setMarking(false)
+          }}
+        />
+      )}
 
       {submitError && (
         <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
