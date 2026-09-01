@@ -166,6 +166,17 @@ Build the production web bundle with `npm run build`. For the Android app,
 `npm run apk` builds a debug APK and `npm run apk:install` pushes it to a
 USB-connected phone — see `ANDROID_BUILD.md` for the one-time toolchain setup.
 
+### Enabling developer mode on a Samsung phone
+
+`npm run apk:install` needs USB debugging, which lives under Developer options.
+On Samsung (One UI):
+
+1. **Settings → About phone → Software information**.
+2. Tap **Build number** seven times; enter your PIN/pattern when asked.
+3. Go back to **Settings → Developer options** (new item near the bottom).
+4. Enable **USB debugging**, plug in the phone, and tap **Allow** on the prompt.
+5. Check the PC sees it: `adb devices` should list the phone as `device`.
+
 ## Deploying the web app
 
 The frontend is a static Vite build; Supabase is the backend and is already
