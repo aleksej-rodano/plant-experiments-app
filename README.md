@@ -77,8 +77,9 @@ build is working too: `npm run apk` produces an installable debug APK, with the
 hardware back button and a themed status bar/splash screen wired up. The phone
 build is deliberately slimmer than the web app — it drops the PDF/CSV export
 buttons and the top-of-experiment photo shortcut (no file downloads on a phone),
-its bottom-bar labels are shortened (Exp. / Feeding / Pests), and adding a photo
-to a log entry offers an explicit **Take photo** vs **Choose from device**
+its bottom-bar labels are shortened (Exp. / Feeding / Pests), and every photo
+field — log entries and the folder / experiment cover image on both the create
+and edit forms — offers an explicit **Take photo** vs **Choose from device**
 choice. The auth token is stored through `@capacitor/preferences` (native
 `SharedPreferences`) rather than the WebView's `localStorage`, which the OS was
 evicting on cold start and logging the user out — you now stay signed in until

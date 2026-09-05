@@ -1,6 +1,7 @@
-import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { CARE_TASK_SUGGESTIONS } from '../lib/utils/care'
@@ -36,8 +37,6 @@ export default function EditFolderPage() {
   // clearing sets `currentUrl` to '' so we know to null it out on save.
   const [image, setImage] = useState<File | null>(null)
   const [currentUrl, setCurrentUrl] = useState(seeded?.cover_image_url ?? '')
-  const [newPreviewUrl, setNewPreviewUrl] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -82,16 +81,6 @@ export default function EditFolderPage() {
     }
   }, [seeded, folderId])
 
-  useEffect(() => {
-    if (!image) {
-      setNewPreviewUrl(null)
-      return
-    }
-    const url = URL.createObjectURL(image)
-    setNewPreviewUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [image])
-
   function pickImage(file: File | undefined) {
     if (!file) return
     const problem = validateImage(file)
@@ -106,7 +95,6 @@ export default function EditFolderPage() {
   function clearImage() {
     setImage(null)
     setCurrentUrl('')
-    if (fileRef.current) fileRef.current.value = ''
   }
 
   function validate() {
@@ -195,7 +183,6 @@ export default function EditFolderPage() {
     )
   }
 
-  const previewSrc = newPreviewUrl ?? (currentUrl || null)
 
   return (
     <section className="mx-auto max-w-lg">
@@ -307,54 +294,14 @@ export default function EditFolderPage() {
           </p>
         </fieldset>
 
-        <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Cover image
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png"
-            onChange={(e) => pickImage(e.target.files?.[0])}
-            className="hidden"
-          />
-          {previewSrc ? (
-            <div className="relative overflow-hidden rounded-lg ring-1 ring-outline-variant">
-              <img
-                src={previewSrc}
-                alt="Cover preview"
-                className="aspect-video w-full object-cover"
-              />
-              <div className="absolute right-2 top-2 flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="rounded-lg bg-surface/80 px-2 py-1.5 text-xs font-medium text-on-surface-variant backdrop-blur hover:bg-surface"
-                >
-                  Replace
-                </button>
-                <button
-                  type="button"
-                  onClick={clearImage}
-                  aria-label="Remove image"
-                  className="rounded-lg bg-surface/80 p-1.5 text-on-surface-variant backdrop-blur hover:bg-surface hover:text-error"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant"
-            >
-              <ImagePlus className="size-5" />
-              Choose JPG or PNG
-            </button>
-          )}
-          {errors.image && (
-            <span className="text-xs text-error">{errors.image}</span>
-          )}
-        </div>
+        <CoverImagePicker
+          image={image}
+          onPick={pickImage}
+          onClear={clearImage}
+          existingUrl={currentUrl}
+          label="Cover image"
+          error={errors.image}
+        />
 
         {submitError && (
           <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">

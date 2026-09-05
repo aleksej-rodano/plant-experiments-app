@@ -1,6 +1,7 @@
-import { ArrowLeft, ImagePlus, Loader2, X } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { ArrowLeft, Loader2 } from 'lucide-react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
@@ -21,8 +22,6 @@ export default function CreateExperimentPage() {
   const [startedOn, setStartedOn] = useState(today)
   const [notes, setNotes] = useState('')
   const [image, setImage] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
   const [errors, setErrors] = useState<{
     title?: string
     plantCount?: string
@@ -33,16 +32,6 @@ export default function CreateExperimentPage() {
   const [busy, setBusy] = useState(false)
 
   const backTo = folderId ? `/folders/${folderId}` : '/experiments'
-
-  useEffect(() => {
-    if (!image) {
-      setPreviewUrl(null)
-      return
-    }
-    const url = URL.createObjectURL(image)
-    setPreviewUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [image])
 
   function pickImage(file: File | undefined) {
     if (!file) return
@@ -57,7 +46,6 @@ export default function CreateExperimentPage() {
 
   function clearImage() {
     setImage(null)
-    if (fileRef.current) fileRef.current.value = ''
   }
 
   async function onSubmit(e: FormEvent) {
@@ -188,45 +176,13 @@ export default function CreateExperimentPage() {
           />
         </label>
 
-        <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Initial photo
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png"
-            onChange={(e) => pickImage(e.target.files?.[0])}
-            className="hidden"
-          />
-          {previewUrl ? (
-            <div className="relative overflow-hidden rounded-lg ring-1 ring-outline-variant">
-              <img
-                src={previewUrl}
-                alt="Initial photo preview"
-                className="aspect-video w-full object-cover"
-              />
-              <button
-                type="button"
-                onClick={clearImage}
-                aria-label="Remove photo"
-                className="absolute right-2 top-2 rounded-lg bg-surface/80 p-1.5 text-on-surface-variant backdrop-blur hover:bg-surface hover:text-error"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline px-4 py-6 text-sm text-on-surface-variant hover:bg-surface-variant"
-            >
-              <ImagePlus className="size-5" />
-              Choose JPG or PNG
-            </button>
-          )}
-          {errors.image && (
-            <span className="text-xs text-error">{errors.image}</span>
-          )}
-        </div>
+        <CoverImagePicker
+          image={image}
+          onPick={pickImage}
+          onClear={clearImage}
+          label="Initial photo"
+          error={errors.image}
+        />
 
         {submitError && (
           <p className="rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
