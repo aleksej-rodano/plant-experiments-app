@@ -262,24 +262,24 @@ export default function FolderDetailPage() {
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
         <h1 className="text-2xl font-medium text-on-surface">{folder.title}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to={`/folders/${folder.id}/edit`}
             state={{ folder }}
             className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
           >
             <Pencil className="size-4" />
-            <span className="hidden sm:inline">Edit</span>
+            <span>Edit folder</span>
           </Link>
           {experiments.length > 0 && !isNativeApp() && (
             <button
               type="button"
               onClick={() => exportFolderToCSV(folder, experiments, logs)}
-              title="Export every experiment in this folder as a spreadsheet"
+              title="Download every experiment in this folder as a CSV spreadsheet"
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
             >
               <Sheet className="size-4" />
-              <span className="hidden sm:inline">CSV</span>
+              <span>Export CSV</span>
             </button>
           )}
           {experiments.length > 0 && (
@@ -290,7 +290,7 @@ export default function FolderDetailPage() {
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
             >
               <CalendarPlus className="size-4" />
-              <span className="hidden sm:inline">Log all</span>
+              <span>Log all experiments</span>
             </Link>
           )}
           <Link
@@ -299,7 +299,7 @@ export default function FolderDetailPage() {
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
           >
             <Plus className="size-4" />
-            <span className="hidden sm:inline">New Experiment</span>
+            <span>New experiment</span>
           </Link>
         </div>
       </div>

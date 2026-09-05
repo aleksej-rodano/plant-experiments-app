@@ -331,14 +331,14 @@ export default function ExperimentDetailPage() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link
             to={`/experiments/${experiment.id}/edit`}
             state={{ experiment }}
             className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
           >
             <Pencil className="size-4" />
-            <span className="hidden sm:inline">Edit</span>
+            <span>Edit experiment</span>
           </Link>
           {/* Export and the quick-photo shortcut are web-only — the phone app
               drops them (no file downloads on device; photos go through the
@@ -349,6 +349,7 @@ export default function ExperimentDetailPage() {
                 type="button"
                 onClick={() => void handleExport('pdf')}
                 disabled={exporting != null}
+                title="Download this experiment and its log as a PDF report"
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
               >
                 {exporting === 'pdf' ? (
@@ -356,15 +357,13 @@ export default function ExperimentDetailPage() {
                 ) : (
                   <FileDown className="size-4" />
                 )}
-                <span className="hidden sm:inline">
-                  {exporting === 'pdf' ? 'Exporting…' : 'PDF'}
-                </span>
+                <span>{exporting === 'pdf' ? 'Exporting…' : 'Export PDF'}</span>
               </button>
               <button
                 type="button"
                 onClick={() => void handleExport('csv')}
                 disabled={exporting != null}
-                title="Export log entries as a spreadsheet"
+                title="Download the log entries as a CSV spreadsheet"
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant disabled:opacity-50"
               >
                 {exporting === 'csv' ? (
@@ -372,18 +371,16 @@ export default function ExperimentDetailPage() {
                 ) : (
                   <Sheet className="size-4" />
                 )}
-                <span className="hidden sm:inline">
-                  {exporting === 'csv' ? 'Exporting…' : 'CSV'}
-                </span>
+                <span>{exporting === 'csv' ? 'Exporting…' : 'Export CSV'}</span>
               </button>
               <Link
                 to={`/experiments/${experiment.id}/logs/photo`}
                 state={{ experiment, folder }}
-                title="Log a photo — note optional"
+                title="Add a photo-only log entry — note optional"
                 className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
               >
                 <Camera className="size-4" />
-                <span className="hidden sm:inline">Photo</span>
+                <span>Log photo</span>
               </Link>
             </>
           )}
@@ -393,7 +390,7 @@ export default function ExperimentDetailPage() {
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
           >
             <Plus className="size-4" />
-            <span className="hidden sm:inline">Add Log Entry</span>
+            <span>Add log entry</span>
           </Link>
         </div>
       </div>

@@ -118,7 +118,9 @@ subtracting the inset twice.
 
 Working today:
 
-- Sign-in and per-user private data
+- Sign-in and per-user private data, with a **"Forgot your password?"** email
+  reset link (the email always points at the hosted web app, then you sign into
+  the phone with the new password)
 - Folders, experiments, and dated log entries with photo uploads
 - **Folder-wide log entries** — from a folder, add one dated update (e.g. a water
   change or a round of fertilizer) to every experiment in that folder at once.
@@ -203,6 +205,11 @@ hosted. Deployment is configured for Vercel (`vercel.json`). One-time setup:
    the data.)
 3. Click **Deploy**. You get a `*.vercel.app` URL; every later push to `main`
    redeploys automatically.
-4. Optional: in Supabase → **Authentication → URL Configuration**, set the Site
-   URL to your Vercel URL. Only needed if you later turn email confirmation back
-   on (it's currently disabled).
+4. In Supabase → **Authentication → URL Configuration**, set the **Site URL** to
+   your Vercel URL and add these to **Redirect URLs**:
+   - `https://<your-app>.vercel.app/reset-password`
+   - `http://localhost:5173/reset-password` (for local dev)
+
+   The password-reset email link uses these; without them Supabase falls back to
+   the Site URL. (Also needed if you ever turn email confirmation back on — it's
+   currently disabled.)

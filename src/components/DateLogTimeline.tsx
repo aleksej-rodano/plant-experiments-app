@@ -143,9 +143,10 @@ export default function DateLogTimeline({
                 to={`/experiments/${experimentId}/logs/${log.id}/edit`}
                 state={{ log, experiment, folder }}
                 aria-label={`Edit log from ${formatLogDate(log.log_date)}`}
-                className="rounded-lg p-1 text-on-surface-variant hover:bg-surface-variant"
+                className="flex items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-on-surface-variant hover:bg-surface-variant"
               >
                 <Pencil className="size-3.5" />
+                Edit
               </Link>
               <button
                 type="button"
@@ -153,9 +154,10 @@ export default function DateLogTimeline({
                   setConfirmingId(confirmingId === log.id ? null : log.id)
                 }
                 aria-label={`Delete log from ${formatLogDate(log.log_date)}`}
-                className="rounded-lg p-1 text-on-surface-variant hover:bg-surface-variant hover:text-error"
+                className="flex items-center gap-1 rounded-lg px-1.5 py-1 text-xs font-medium text-on-surface-variant hover:bg-surface-variant hover:text-error"
               >
                 <Trash2 className="size-3.5" />
+                Delete
               </button>
             </div>
           </div>

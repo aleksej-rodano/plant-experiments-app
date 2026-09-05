@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { AuthContext, type AuthContextValue } from './auth-context'
+import { isNativeApp } from './native'
 import { supabase } from './supabase'
+
+// The hosted web app handles the reset link even when the request came from the
+// phone, so point the email there rather than at capacitor://localhost.
+const WEB_APP_ORIGIN = 'https://plant-experiments-app.vercel.app'
+
+function resetRedirectUrl(): string {
+  const origin =
+    !isNativeApp() && typeof window !== 'undefined'
+      ? window.location.origin
+      : WEB_APP_ORIGIN
+  return `${origin}/reset-password`
+}
 
 /**
  * Read the persisted Supabase session straight out of localStorage so returning
@@ -29,6 +42,7 @@ function readStoredSession(): Session | null {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => readStoredSession())
   const [loading, setLoading] = useState(true)
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -39,8 +53,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false)
     })
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       if (cancelled) return
+      // A reset link opens the app with a short-lived session; hold the UI on
+      // the "set a new password" screen until the user picks one.
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
       setSession(next)
       setLoading(false)
     })
@@ -77,8 +94,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { error } = await supabase.auth.signOut()
         if (error) throw error
       },
+      sendPasswordReset: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: resetRedirectUrl(),
+        })
+        if (error) throw error
+      },
+      updatePassword: async (password) => {
+        const { error } = await supabase.auth.updateUser({ password })
+        if (error) throw error
+        setRecovering(false)
+      },
+      recovering,
     }),
-    [session, loading],
+    [session, loading, recovering],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

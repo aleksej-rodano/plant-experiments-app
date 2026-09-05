@@ -20,6 +20,7 @@ import LoginPage from './pages/LoginPage'
 import NotesPage from './pages/NotesPage'
 import PestControlPage from './pages/PestControlPage'
 import QuickPhotoLogPage from './pages/QuickPhotoLogPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
 import StatsPage from './pages/StatsPage'
 import TipsPage from './pages/TipsPage'
@@ -47,12 +48,23 @@ function RouterEffects() {
 }
 
 function App() {
-  const { user, loading } = useAuth()
+  const { user, loading, recovering } = useAuth()
+
+  // A password-reset link opens the app with a live session; keep the user on
+  // the "set a new password" screen until they've picked one, whatever the URL.
+  if (recovering) {
+    return (
+      <BrowserRouter>
+        <ResetPasswordPage />
+      </BrowserRouter>
+    )
+  }
 
   return (
     <BrowserRouter>
       <RouterEffects />
       <Routes>
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/login"
           element={

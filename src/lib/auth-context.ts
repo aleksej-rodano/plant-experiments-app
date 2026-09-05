@@ -11,6 +11,12 @@ export interface AuthContextValue {
     password: string,
   ) => Promise<{ needsEmailConfirmation: boolean }>
   signOut: () => Promise<void>
+  /** Email the user a password-reset link (lands on /reset-password). */
+  sendPasswordReset: (email: string) => Promise<void>
+  /** Set a new password for the currently-recovering session. */
+  updatePassword: (password: string) => Promise<void>
+  /** True after a password-recovery link has opened the app. */
+  recovering: boolean
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
