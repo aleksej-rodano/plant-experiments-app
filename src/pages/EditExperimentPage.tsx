@@ -1,8 +1,10 @@
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import CareScheduleFields from '../components/CareScheduleFields'
 import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
+import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type {
@@ -43,6 +45,10 @@ export default function EditExperimentPage() {
     seeded?.status ?? 'ongoing',
   )
   const [notes, setNotes] = useState(seeded?.notes ?? '')
+  const [careTask, setCareTask] = useState(seeded?.care_task_label ?? '')
+  const [careInterval, setCareInterval] = useState(
+    seeded?.care_interval_days != null ? String(seeded.care_interval_days) : '',
+  )
   const [image, setImage] = useState<File | null>(null)
   const [currentUrl, setCurrentUrl] = useState(seeded?.cover_image_url ?? '')
 
@@ -73,6 +79,10 @@ export default function EditExperimentPage() {
         setStartedOn(data.started_on ?? today())
         setStatus(data.status ?? 'ongoing')
         setNotes(data.notes ?? '')
+        setCareTask(data.care_task_label ?? '')
+        setCareInterval(
+          data.care_interval_days != null ? String(data.care_interval_days) : '',
+        )
         setCurrentUrl(data.cover_image_url ?? '')
       }
       setLoading(false)
@@ -108,6 +118,11 @@ export default function EditExperimentPage() {
     if (!startedOn) next.startedOn = 'Pick a start date.'
     else if (startedOn > today())
       next.startedOn = 'Start date cannot be in the future.'
+    if (careInterval.trim()) {
+      const n = Number(careInterval)
+      if (!Number.isInteger(n) || n < 1)
+        next.careInterval = 'Enter a whole number of days ≥ 1.'
+    }
     setErrors(next)
     return Object.keys(next).length === 0
   }
@@ -137,12 +152,15 @@ export default function EditExperimentPage() {
         status,
         notes: notes.trim() || null,
         cover_image_url: coverUrl,
+        care_task_label: careInterval.trim() ? careTask.trim() || null : null,
+        care_interval_days: careInterval.trim() ? Number(careInterval) : null,
       }
       const { error } = await supabase
         .from('experiments')
         .update(payload)
         .eq('id', id)
       if (error) throw error
+      void syncCareNotifications()
       navigate(backTo, {
         replace: true,
         state: { toast: 'Experiment updated.' },
@@ -261,6 +279,14 @@ export default function EditExperimentPage() {
             className={inputClass}
           />
         </label>
+
+        <CareScheduleFields
+          task={careTask}
+          onTask={setCareTask}
+          interval={careInterval}
+          onInterval={setCareInterval}
+          error={errors.careInterval}
+        />
 
         <CoverImagePicker
           image={image}

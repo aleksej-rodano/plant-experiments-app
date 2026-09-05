@@ -1,5 +1,10 @@
 import { Capacitor } from '@capacitor/core'
 
+export {
+  syncCareNotifications,
+  useCareNotificationsSync,
+} from './notifications'
+
 /**
  * True when running inside the Capacitor native shell (the Android app), false on
  * the hosted web app / `npm run dev`. Used to hide web-only features (PDF/CSV

@@ -2,6 +2,7 @@ import { Loader2 } from 'lucide-react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { useAuth } from './lib/hooks/useAuth'
+import { useCareNotificationsSync } from './lib/native'
 import { useAndroidBackButton } from './lib/native/useAndroidBackButton'
 import AddDateLogPage from './pages/AddDateLogPage'
 import AddFolderDateLogPage from './pages/AddFolderDateLogPage'
@@ -41,6 +42,7 @@ function RequireAuth() {
 
 function RouterEffects() {
   useAndroidBackButton()
+  useCareNotificationsSync()
   return null
 }
 

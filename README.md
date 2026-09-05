@@ -133,7 +133,11 @@ Working today:
 - **Comparison charts and a verdict** on which treatment is winning inside a
   folder, including how many days each took to root
 - **Stats** across every folder — survival by treatment, folder, and origin
-- **Recurring reminders** per folder, with overdue badges on the folder list
+- **Recurring reminders** on a folder *and* on each experiment (both optional) —
+  a task label and a repeat interval, with overdue badges on the folder list. On
+  the Android app these also fire a phone notification at 11:00 each day that
+  lists every folder / experiment chore due or overdue, and keep re-notifying
+  each morning until the task is marked done.
 - Editing a folder's details, description, and cover image
 - PDF and CSV export, per experiment and per folder
 - **Bin** — deleting anything moves it to a bin you can restore from for 30 days,

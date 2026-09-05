@@ -67,6 +67,9 @@ export interface Database {
           cover_image_url: string | null
           started_on: string
           status: ExperimentStatus
+          care_task_label: string | null
+          care_interval_days: number | null
+          care_last_done_on: string | null
           created_at: string
           updated_at: string
           deleted_at: string | null
@@ -85,6 +88,9 @@ export interface Database {
           cover_image_url?: string | null
           started_on?: string
           status?: ExperimentStatus
+          care_task_label?: string | null
+          care_interval_days?: number | null
+          care_last_done_on?: string | null
           created_at?: string
           updated_at?: string
           deleted_at?: string | null

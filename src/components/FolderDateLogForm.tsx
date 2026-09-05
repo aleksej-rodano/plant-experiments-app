@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import PhotoAnnotator from './PhotoAnnotator'
 import QuickCareButtons from './QuickCareButtons'
 import { useAuth } from '../lib/hooks/useAuth'
+import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Experiment } from '../types/database'
@@ -125,6 +126,7 @@ export default function FolderDateLogForm({
           .from('folders')
           .update({ care_last_done_on: today() })
           .eq('id', folderId)
+        void syncCareNotifications()
       }
 
       navigate(backTo, {
@@ -184,6 +186,7 @@ export default function FolderDateLogForm({
           .from('folders')
           .update({ care_last_done_on: logDate })
           .eq('id', folderId)
+        void syncCareNotifications()
       }
 
       navigate(backTo, {

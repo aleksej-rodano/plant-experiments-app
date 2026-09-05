@@ -18,7 +18,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import CareBanner from '../components/CareBanner'
 import ComparisonChart from '../components/ComparisonChart'
 import WinnerCallout from '../components/WinnerCallout'
-import { isNativeApp } from '../lib/native'
+import { isNativeApp, syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { binFolder } from '../lib/utils/bin'
 import { today } from '../lib/utils/care'
@@ -171,6 +171,7 @@ export default function FolderDetailPage() {
       return
     }
     if (data) setFolder(data)
+    void syncCareNotifications()
     setToast('Marked done.')
     setTimeout(() => setToast(null), 3000)
   }
@@ -239,7 +240,12 @@ export default function FolderDetailPage() {
         </div>
       )}
 
-      <CareBanner folder={folder} onMarkDone={handleMarkCareDone} />
+      <CareBanner
+        schedule={folder}
+        editHref={`/folders/${folder.id}/edit`}
+        editState={{ folder }}
+        onMarkDone={handleMarkCareDone}
+      />
 
       <div className="mt-3 flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-surface-variant">
         {folder.cover_image_url ? (

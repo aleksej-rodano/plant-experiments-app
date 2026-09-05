@@ -11,11 +11,13 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import CareBanner from '../components/CareBanner'
 import DateLogTimeline from '../components/DateLogTimeline'
 import MeasurementsChart from '../components/MeasurementsChart'
-import { isNativeApp } from '../lib/native'
+import { isNativeApp, syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { binExperiment } from '../lib/utils/bin'
+import { today } from '../lib/utils/care'
 import { exportExperimentToCSV } from '../lib/utils/csvExport'
 import {
   SURVIVAL_TEXT_CLASS,
@@ -204,6 +206,24 @@ export default function ExperimentDetailPage() {
     }
   }
 
+  async function handleMarkCareDone() {
+    if (!experiment) return
+    const { data, error } = await supabase
+      .from('experiments')
+      .update({ care_last_done_on: today() })
+      .eq('id', experiment.id)
+      .select()
+      .maybeSingle()
+    if (error) {
+      setError(error.message)
+      return
+    }
+    if (data) setExperiment(data)
+    void syncCareNotifications()
+    setToast('Marked done.')
+    setTimeout(() => setToast(null), 3000)
+  }
+
   async function handleDelete() {
     if (!id) return
     setDeleting(true)
@@ -269,6 +289,13 @@ export default function ExperimentDetailPage() {
           <span>{toast}</span>
         </div>
       )}
+
+      <CareBanner
+        schedule={experiment}
+        editHref={`/experiments/${experiment.id}/edit`}
+        editState={{ experiment }}
+        onMarkDone={handleMarkCareDone}
+      />
 
       <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

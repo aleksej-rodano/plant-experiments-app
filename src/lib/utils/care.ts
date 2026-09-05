@@ -1,7 +1,16 @@
-import type { Folder } from '../../types/database'
 import { daysBetween } from './insights'
 
 export const today = () => new Date().toISOString().slice(0, 10)
+
+/**
+ * The three columns that describe a recurring chore. Both `folders` and
+ * `experiments` carry this shape, so `careStatus` works on either.
+ */
+export interface CareSchedule {
+  care_task_label: string | null
+  care_interval_days: number | null
+  care_last_done_on: string | null
+}
 
 export interface CareStatus {
   label: string
@@ -24,16 +33,16 @@ function addDays(iso: string, days: number) {
 }
 
 /**
- * Where a folder's recurring chore stands right now. Null when no schedule is
- * set up, or when it's set up but has never been marked done.
+ * Where a recurring chore stands right now, for a folder or an experiment. Null
+ * when no schedule is set up.
  */
-export function careStatus(folder: Folder): CareStatus | null {
-  const interval = folder.care_interval_days
+export function careStatus(row: CareSchedule): CareStatus | null {
+  const interval = row.care_interval_days
   if (!interval || interval <= 0) return null
 
-  const label = folder.care_task_label?.trim() || 'Care task'
+  const label = row.care_task_label?.trim() || 'Care task'
   // Never done yet: treat it as due today so it doesn't sit invisible forever.
-  const from = folder.care_last_done_on ?? today()
+  const from = row.care_last_done_on ?? today()
   const dueOn = addDays(from, interval)
   const daysUntilDue = daysBetween(today(), dueOn) ?? 0
 

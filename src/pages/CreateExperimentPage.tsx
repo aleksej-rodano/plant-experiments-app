@@ -1,8 +1,10 @@
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import CareScheduleFields from '../components/CareScheduleFields'
 import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
+import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Database } from '../types/database'
@@ -21,11 +23,14 @@ export default function CreateExperimentPage() {
   const [plantCount, setPlantCount] = useState('')
   const [startedOn, setStartedOn] = useState(today)
   const [notes, setNotes] = useState('')
+  const [careTask, setCareTask] = useState('')
+  const [careInterval, setCareInterval] = useState('')
   const [image, setImage] = useState<File | null>(null)
   const [errors, setErrors] = useState<{
     title?: string
     plantCount?: string
     startedOn?: string
+    careInterval?: string
     image?: string
   }>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -56,6 +61,7 @@ export default function CreateExperimentPage() {
       title?: string
       plantCount?: string
       startedOn?: string
+      careInterval?: string
     } = {}
     if (!title.trim()) nextErrors.title = 'Name is required.'
     const count = Number(plantCount)
@@ -65,6 +71,11 @@ export default function CreateExperimentPage() {
     if (!startedOn) nextErrors.startedOn = 'Pick a start date.'
     else if (startedOn > today())
       nextErrors.startedOn = 'Start date cannot be in the future.'
+    if (careInterval.trim()) {
+      const n = Number(careInterval)
+      if (!Number.isInteger(n) || n < 1)
+        nextErrors.careInterval = 'Enter a whole number of days ≥ 1.'
+    }
     setErrors((prev) => ({ ...prev, ...nextErrors }))
     if (Object.keys(nextErrors).length > 0) return
 
@@ -88,9 +99,12 @@ export default function CreateExperimentPage() {
         started_on: startedOn,
         notes: notes.trim() || null,
         cover_image_url: coverUrl,
+        care_task_label: careInterval.trim() ? careTask.trim() || null : null,
+        care_interval_days: careInterval.trim() ? Number(careInterval) : null,
       }
       const { error } = await supabase.from('experiments').insert(payload)
       if (error) throw error
+      void syncCareNotifications()
       navigate(backTo, {
         replace: true,
         state: { toast: 'Experiment created.' },
@@ -175,6 +189,14 @@ export default function CreateExperimentPage() {
             className={inputClass}
           />
         </label>
+
+        <CareScheduleFields
+          task={careTask}
+          onTask={setCareTask}
+          interval={careInterval}
+          onInterval={setCareInterval}
+          error={errors.careInterval}
+        />
 
         <CoverImagePicker
           image={image}
