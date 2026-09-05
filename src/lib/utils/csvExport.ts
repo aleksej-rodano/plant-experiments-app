@@ -47,6 +47,8 @@ export function downloadCsv(text: string, filename: string): void {
 const LOG_HEADERS = [
   'log_date',
   'status_details',
+  'watered',
+  'fertilized',
   'root_length_mm',
   'new_leaves',
   'deaths_count',
@@ -58,6 +60,8 @@ function logCells(log: DateLog): unknown[] {
   return [
     log.log_date,
     log.status_details,
+    log.watered,
+    log.fertilized,
     log.root_length_mm,
     log.new_leaves,
     log.deaths_count,

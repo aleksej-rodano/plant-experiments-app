@@ -1,4 +1,13 @@
-import { Loader2, Pencil, Ruler, Skull, Sprout, Trash2 } from 'lucide-react'
+import {
+  Droplets,
+  FlaskConical,
+  Loader2,
+  Pencil,
+  Ruler,
+  Skull,
+  Sprout,
+  Trash2,
+} from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -158,10 +167,24 @@ export default function DateLogTimeline({
             </p>
           )}
 
-          {(log.root_length_mm != null ||
+          {(log.watered ||
+            log.fertilized ||
+            log.root_length_mm != null ||
             log.new_leaves != null ||
             log.deaths_count > 0) && (
             <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-on-surface-variant">
+              {log.watered && (
+                <span className="flex items-center gap-1">
+                  <Droplets className="size-3.5" />
+                  Watered
+                </span>
+              )}
+              {log.fertilized && (
+                <span className="flex items-center gap-1">
+                  <FlaskConical className="size-3.5" />
+                  Fertilized
+                </span>
+              )}
               {log.root_length_mm != null && (
                 <span className="flex items-center gap-1">
                   <Ruler className="size-3.5" />

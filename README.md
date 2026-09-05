@@ -125,6 +125,11 @@ Working today:
   Each experiment still gets its own entry, so it shows up in every individual
   timeline.
 - **Quick photo logging** — one tap, take a picture, done; the note is optional
+- **Plant watered / Fertilized** — one-tap buttons on the add-log forms write a
+  today-dated entry with nothing else to fill in. From a folder they log to every
+  experiment at once, and "watered" also resets that folder's reminder. Both
+  flags get their own column in the CSV export, so every watering / feeding date
+  is in the sheet.
 - **Comparison charts and a verdict** on which treatment is winning inside a
   folder, including how many days each took to root
 - **Stats** across every folder — survival by treatment, folder, and origin

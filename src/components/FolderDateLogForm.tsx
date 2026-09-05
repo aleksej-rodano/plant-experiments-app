@@ -2,6 +2,7 @@ import { Circle, ImagePlus, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PhotoAnnotator from './PhotoAnnotator'
+import QuickCareButtons from './QuickCareButtons'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
@@ -51,6 +52,9 @@ export default function FolderDateLogForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [quickPending, setQuickPending] = useState<
+    'watered' | 'fertilized' | null
+  >(null)
 
   const count = experiments.length
 
@@ -88,6 +92,58 @@ export default function FolderDateLogForm({
     else if (logDate > today()) next.logDate = 'Date cannot be in the future.'
     setErrors(next)
     return Object.keys(next).length === 0
+  }
+
+  async function quickLog(kind: 'watered' | 'fertilized') {
+    setSubmitError(null)
+    if (!user) {
+      setSubmitError('You must be signed in.')
+      return
+    }
+    if (count === 0) {
+      setSubmitError('This folder has no experiments to log against yet.')
+      return
+    }
+    setBusy(true)
+    setQuickPending(kind)
+    try {
+      const rows = experiments.map((exp) => ({
+        experiment_id: exp.id,
+        log_date: today(),
+        status_details: '',
+        deaths_count: 0,
+        watered: kind === 'watered',
+        fertilized: kind === 'fertilized',
+      }))
+      const { error } = await supabase.from('date_logs').insert(rows)
+      if (error) throw error
+
+      // The folder reminder tracks the water change, so a "watered" entry
+      // resets its clock; "fertilized" is a different chore and leaves it alone.
+      if (folderId && kind === 'watered') {
+        await supabase
+          .from('folders')
+          .update({ care_last_done_on: today() })
+          .eq('id', folderId)
+      }
+
+      navigate(backTo, {
+        replace: true,
+        state: {
+          toast:
+            kind === 'watered'
+              ? `Watered — logged to ${count} experiment${count === 1 ? '' : 's'}.`
+              : `Fertilized — logged to ${count} experiment${count === 1 ? '' : 's'}.`,
+          ...doneState,
+        },
+      })
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : 'Could not save the quick log.',
+      )
+      setBusy(false)
+      setQuickPending(null)
+    }
   }
 
   async function onSubmit(e: FormEvent) {
@@ -147,6 +203,14 @@ export default function FolderDateLogForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      {count > 0 && (
+        <QuickCareButtons
+          onLog={(kind) => void quickLog(kind)}
+          busy={busy}
+          pending={quickPending}
+        />
+      )}
+
       <p className="rounded-lg bg-surface-container px-3 py-2 text-sm text-on-surface-variant">
         {count === 0 ? (
           'No experiments in this folder yet.'

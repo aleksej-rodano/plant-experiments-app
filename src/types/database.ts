@@ -105,6 +105,8 @@ export interface Database {
           new_leaves: number | null
           deaths_count: number
           death_cause: string | null
+          watered: boolean
+          fertilized: boolean
           created_at: string
           updated_at: string
           deleted_at: string | null
@@ -121,6 +123,8 @@ export interface Database {
           new_leaves?: number | null
           deaths_count?: number
           death_cause?: string | null
+          watered?: boolean
+          fertilized?: boolean
           created_at?: string
           updated_at?: string
           deleted_at?: string | null

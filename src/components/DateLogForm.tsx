@@ -2,6 +2,7 @@ import { Camera, Circle, ImagePlus, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PhotoAnnotator from './PhotoAnnotator'
+import QuickCareButtons from './QuickCareButtons'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
@@ -71,6 +72,9 @@ export default function DateLogForm({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [quickPending, setQuickPending] = useState<
+    'watered' | 'fertilized' | null
+  >(null)
 
   // How many plants may still be marked dead in this entry.
   const aliveBefore =
@@ -135,6 +139,40 @@ export default function DateLogForm({
     return Object.keys(next).length === 0
   }
 
+  async function quickLog(kind: 'watered' | 'fertilized') {
+    setSubmitError(null)
+    if (!user) {
+      setSubmitError('You must be signed in.')
+      return
+    }
+    setBusy(true)
+    setQuickPending(kind)
+    try {
+      const { error } = await supabase.from('date_logs').insert({
+        experiment_id: experimentId,
+        log_date: today(),
+        status_details: '',
+        deaths_count: 0,
+        watered: kind === 'watered',
+        fertilized: kind === 'fertilized',
+      })
+      if (error) throw error
+      navigate(backTo, {
+        replace: true,
+        state: {
+          toast: kind === 'watered' ? 'Logged: watered today.' : 'Logged: fertilized today.',
+          ...doneState,
+        },
+      })
+    } catch (err) {
+      setSubmitError(
+        err instanceof Error ? err.message : 'Could not save the quick log.',
+      )
+      setBusy(false)
+      setQuickPending(null)
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setSubmitError(null)
@@ -189,6 +227,14 @@ export default function DateLogForm({
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      {mode === 'add' && (
+        <QuickCareButtons
+          onLog={(kind) => void quickLog(kind)}
+          busy={busy}
+          pending={quickPending}
+        />
+      )}
+
       <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
         Date *
         <input
