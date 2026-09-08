@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { binRow } from '../lib/utils/bin'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Note } from '../types/database'
+import ImageLightbox from '../components/ImageLightbox'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
@@ -30,6 +31,7 @@ export default function NotesPage() {
   const [busy, setBusy] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<string | null>(null)
+  const [zoomedUrl, setZoomedUrl] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -266,16 +268,27 @@ export default function NotesPage() {
                 {note.body}
               </p>
               {note.image_url && (
-                <img
-                  src={note.image_url}
-                  alt="Note attachment"
-                  className="mt-2 max-h-72 rounded-lg object-cover ring-1 ring-outline-variant"
-                  loading="lazy"
-                />
+                <button
+                  type="button"
+                  onClick={() => note.image_url && setZoomedUrl(note.image_url)}
+                  aria-label="Expand note photo"
+                  className="mt-2 block overflow-hidden rounded-lg ring-1 ring-outline-variant"
+                >
+                  <img
+                    src={note.image_url}
+                    alt="Note attachment"
+                    className="max-h-72 w-full object-cover transition-transform hover:scale-[1.02]"
+                    loading="lazy"
+                  />
+                </button>
               )}
             </li>
           ))}
         </ul>
+      )}
+
+      {zoomedUrl && (
+        <ImageLightbox src={zoomedUrl} onClose={() => setZoomedUrl(null)} />
       )}
     </section>
   )

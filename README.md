@@ -20,7 +20,8 @@ The app is organised in three levels:
    number of plants involved, notes, and an initial photo.
 3. **Log entries** — inside an experiment, you add dated updates: how the plants
    look that day, with an optional photo. These stack up into a timeline so you
-   can see progress at a glance.
+   can see progress at a glance. Tap any photo in the timeline (or on a note) to
+   open it full-screen, then pinch or double-tap to zoom in and drag to pan.
 
 Three ways to add a log entry, depending on how much you want to type:
 

@@ -13,6 +13,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { binRow } from '../lib/utils/bin'
 import type { DateLog, Experiment, Folder } from '../types/database'
+import ImageLightbox from './ImageLightbox'
 
 interface Props {
   experimentId: string
@@ -45,6 +46,7 @@ export default function DateLogTimeline({
   const [error, setError] = useState<string | null>(null)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [zoomedUrl, setZoomedUrl] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setError(null)
@@ -130,6 +132,7 @@ export default function DateLogTimeline({
   }
 
   return (
+    <>
     <ol className="relative ml-1.5 border-l-2 border-outline-variant">
       {logs.map((log) => (
         <li key={log.id} className="relative pb-6 pl-6 last:pb-0">
@@ -209,12 +212,19 @@ export default function DateLogTimeline({
           )}
 
           {log.image_url && (
-            <img
-              src={log.image_url}
-              alt={`Log from ${formatLogDate(log.log_date)}`}
-              className="mt-2 max-h-64 rounded-lg object-cover ring-1 ring-outline-variant"
-              loading="lazy"
-            />
+            <button
+              type="button"
+              onClick={() => log.image_url && setZoomedUrl(log.image_url)}
+              aria-label={`Expand photo from ${formatLogDate(log.log_date)}`}
+              className="mt-2 block overflow-hidden rounded-lg ring-1 ring-outline-variant"
+            >
+              <img
+                src={log.image_url}
+                alt={`Log from ${formatLogDate(log.log_date)}`}
+                className="max-h-64 w-full object-cover transition-transform hover:scale-[1.02]"
+                loading="lazy"
+              />
+            </button>
           )}
 
           {confirmingId === log.id && (
@@ -246,5 +256,9 @@ export default function DateLogTimeline({
         </li>
       ))}
     </ol>
+      {zoomedUrl && (
+        <ImageLightbox src={zoomedUrl} onClose={() => setZoomedUrl(null)} />
+      )}
+    </>
   )
 }

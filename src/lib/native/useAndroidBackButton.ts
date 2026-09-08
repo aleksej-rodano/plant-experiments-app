@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 import { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { consumeBack } from './backInterceptor'
 
 // Top-level destinations: from any of these the back button leaves for the
 // Experiments home; pressing it again on Experiments exits the app.
@@ -32,6 +33,8 @@ export function useAndroidBackButton(): void {
     let remove: (() => void) | undefined
     void import('@capacitor/app').then(({ App }) => {
       const handle = App.addListener('backButton', () => {
+        // Let an open overlay (e.g. the photo viewer) swallow the press first.
+        if (consumeBack()) return
         const path = location.pathname
         if (!ROOT_ROUTES.has(path)) {
           navigate(-1)
