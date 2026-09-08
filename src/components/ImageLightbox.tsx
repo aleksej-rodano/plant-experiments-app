@@ -178,7 +178,6 @@ export default function ImageLightbox({ src, alt = '', onClose }: Props) {
   }
 
   function onWheel(e: React.WheelEvent) {
-    e.preventDefault()
     const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
     zoomAround(tRef.current.scale * factor, e.clientX, e.clientY)
   }
@@ -194,7 +193,7 @@ export default function ImageLightbox({ src, alt = '', onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] touch-none select-none overflow-hidden bg-black/95"
+      className="fixed inset-0 z-[60] touch-none select-none overflow-hidden overscroll-none bg-black/95"
       role="dialog"
       aria-modal="true"
       aria-label="Photo viewer"
