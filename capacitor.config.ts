@@ -9,6 +9,14 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: '#ffffff',
   },
+  server: {
+    // The installed app loads the live site instead of the copy bundled in the
+    // APK, so `git push` (→ Vercel deploy) updates the phone with no reinstall.
+    // Only rebuild + sideload the APK when *native* code changes — plugins, this
+    // file, or AndroidManifest. Comment this block out to run the bundled build
+    // for offline / local native debugging.
+    url: 'https://plant-experiments-app.vercel.app',
+  },
   plugins: {
     SplashScreen: {
       launchAutoHide: false, // initNative() hides it once React has mounted

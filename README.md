@@ -86,9 +86,24 @@ on phones.
 ## Current state
 
 The web app is **live at https://plant-experiments-app.vercel.app** (deployed
-from `main` via Vercel) and also runs locally with `npm run dev`. An Android
-build is working too: `npm run apk` produces an installable debug APK, with the
-hardware back button and a themed status bar/splash screen wired up. The phone
+from `main` via Vercel) and also runs locally with `npm run dev`.
+
+It's an **installable PWA** — open the site on a phone or desktop and use the
+browser's "Install app" / "Add to Home Screen", and it runs in its own window
+with the plant-green icon. The service worker precaches the (content-hashed)
+build so it launches fast and picks up each new deploy silently; nothing from
+Supabase is cached, so data is always live. There is no offline mode — the app
+needs a connection to load its data.
+
+The Android app is a thin **Capacitor** shell that now loads the live site
+directly (`server.url` in `capacitor.config.ts`) instead of a copy baked into
+the APK. So a `git push` — which redeploys Vercel — updates the phone on its
+next launch, no USB reinstall. You only rebuild and sideload the APK
+(`npm run apk:install`) when *native* code changes: a plugin, `capacitor.config.ts`,
+or `AndroidManifest.xml`. The shell keeps the native pieces the PWA can't do —
+the 11:00 daily care-reminder notifications, hardware back button, themed status
+bar/splash, and native token storage. The service worker is not registered
+inside the shell, so the WebView always shows the freshest deploy. The phone
 build is deliberately slimmer than the web app — it drops the PDF/CSV export
 buttons and the top-of-experiment photo shortcut (no file downloads on a phone),
 its bottom-bar labels are shortened (Exp. / Feeding / Pests), and every photo
