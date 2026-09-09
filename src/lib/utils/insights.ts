@@ -1,5 +1,12 @@
 import type { DateLog, Experiment } from '../../types/database'
 import { dayMs } from './chart'
+import {
+  daysToStage,
+  reachedRoot,
+  reachedShoot,
+  stageSnapshot,
+  type StageSnapshot,
+} from './stages'
 import { successRate, survivorCount, totalDeaths } from './survival'
 
 const DAY = 86_400_000
@@ -10,28 +17,6 @@ export function daysBetween(from: string | null, to: string | null) {
   return Math.round((dayMs(to) - dayMs(from)) / DAY)
 }
 
-/**
- * Days from the experiment's start to the first log that recorded `metric`.
- * Null when the experiment never reached that milestone.
- */
-export function daysToFirst(
-  experiment: Experiment,
-  logs: DateLog[],
-  metric: 'root_length_mm' | 'new_leaves',
-): number | null {
-  const reached = logs
-    .filter((l) => {
-      const v = l[metric]
-      return v != null && v > 0
-    })
-    .map((l) => l.log_date)
-    .sort()
-  if (reached.length === 0) return null
-  const days = daysBetween(experiment.started_on, reached[0])
-  // A log back-dated before the start would give a negative age; clamp to 0.
-  return days == null ? null : Math.max(0, days)
-}
-
 export interface ExperimentSummary {
   experiment: Experiment
   logs: DateLog[]
@@ -40,10 +25,12 @@ export interface ExperimentSummary {
   alive: number
   /** survivors / initial, or null with no plant count to divide by. */
   rate: number | null
+  /** Days from start to the first check-in with any plant at R1+. */
   daysToRoot: number | null
+  /** Days from start to the first check-in with any plant at S1+. */
   daysToLeaf: number | null
-  /** Largest root measurement recorded, in mm. */
-  maxRootMm: number | null
+  /** Latest check-in that recorded stage counts, with percentages. */
+  snapshot: StageSnapshot | null
   lastLogDate: string | null
 }
 
@@ -53,9 +40,6 @@ export function summarise(
 ): ExperimentSummary {
   const deaths = totalDeaths(logs)
   const initial = experiment.plant_count ?? null
-  const roots = logs
-    .map((l) => l.root_length_mm)
-    .filter((v): v is number => v != null)
   const dates = logs.map((l) => l.log_date).sort()
 
   return {
@@ -65,9 +49,9 @@ export function summarise(
     deaths,
     alive: survivorCount(initial, deaths),
     rate: successRate(initial, deaths),
-    daysToRoot: daysToFirst(experiment, logs, 'root_length_mm'),
-    daysToLeaf: daysToFirst(experiment, logs, 'new_leaves'),
-    maxRootMm: roots.length > 0 ? Math.max(...roots) : null,
+    daysToRoot: daysToStage(experiment, logs, reachedRoot),
+    daysToLeaf: daysToStage(experiment, logs, reachedShoot),
+    snapshot: stageSnapshot(logs, initial),
     lastLogDate: dates.length > 0 ? dates[dates.length - 1] : null,
   }
 }
