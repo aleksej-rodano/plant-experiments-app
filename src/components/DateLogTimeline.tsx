@@ -3,15 +3,17 @@ import {
   FlaskConical,
   Loader2,
   Pencil,
-  Ruler,
   Skull,
   Sprout,
+  TriangleAlert,
   Trash2,
+  Waves,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { binRow } from '../lib/utils/bin'
+import { stageEntry } from '../lib/utils/stages'
 import type { DateLog, Experiment, Folder } from '../types/database'
 import ImageLightbox from './ImageLightbox'
 
@@ -172,44 +174,57 @@ export default function DateLogTimeline({
             </p>
           )}
 
-          {(log.watered ||
-            log.fertilized ||
-            log.root_length_mm != null ||
-            log.new_leaves != null ||
-            log.deaths_count > 0) && (
-            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-on-surface-variant">
-              {log.watered && (
-                <span className="flex items-center gap-1">
-                  <Droplets className="size-3.5" />
-                  Watered
-                </span>
-              )}
-              {log.fertilized && (
-                <span className="flex items-center gap-1">
-                  <FlaskConical className="size-3.5" />
-                  Fertilized
-                </span>
-              )}
-              {log.root_length_mm != null && (
-                <span className="flex items-center gap-1">
-                  <Ruler className="size-3.5" />
-                  {log.root_length_mm} mm roots
-                </span>
-              )}
-              {log.new_leaves != null && (
-                <span className="flex items-center gap-1">
-                  <Sprout className="size-3.5" />+{log.new_leaves} leaves
-                </span>
-              )}
-              {log.deaths_count > 0 && (
-                <span className="flex items-center gap-1 text-error">
-                  <Skull className="size-3.5" />
-                  {log.deaths_count} died
-                  {log.death_cause ? ` · ${log.death_cause}` : ''}
-                </span>
-              )}
-            </div>
-          )}
+          {(() => {
+            const stage = stageEntry(log)
+            if (
+              !log.watered &&
+              !log.fertilized &&
+              !stage &&
+              log.deaths_count === 0
+            )
+              return null
+            return (
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-on-surface-variant">
+                {log.watered && (
+                  <span className="flex items-center gap-1">
+                    <Droplets className="size-3.5" />
+                    Watered
+                  </span>
+                )}
+                {log.fertilized && (
+                  <span className="flex items-center gap-1">
+                    <FlaskConical className="size-3.5" />
+                    Fertilized
+                  </span>
+                )}
+                {stage && (
+                  <span className="flex items-center gap-1">
+                    <Waves className="size-3.5" />
+                    Roots {stage.root.join(' / ')}
+                  </span>
+                )}
+                {stage && (
+                  <span className="flex items-center gap-1">
+                    <Sprout className="size-3.5" />
+                    Shoots {stage.shoot.join(' / ')}
+                  </span>
+                )}
+                {stage && stage.leafingWithoutRooting > 0 && (
+                  <span className="flex items-center gap-1 text-error">
+                    <TriangleAlert className="size-3.5" />
+                    {stage.leafingWithoutRooting} leafing, no root
+                  </span>
+                )}
+                {log.deaths_count > 0 && (
+                  <span className="flex items-center gap-1 text-error">
+                    <Skull className="size-3.5" />
+                    {log.deaths_count} died
+                    {log.death_cause ? ` · ${log.death_cause}` : ''}
+                  </span>
+                )}
+              </div>
+            )
+          })()}
 
           {log.image_url && (
             <button

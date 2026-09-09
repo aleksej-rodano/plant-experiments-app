@@ -13,7 +13,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import CareBanner from '../components/CareBanner'
 import DateLogTimeline from '../components/DateLogTimeline'
-import MeasurementsChart from '../components/MeasurementsChart'
+import StageChart from '../components/StageChart'
+import StageSnapshot from '../components/StageSnapshot'
 import { isNativeApp, syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { binExperiment } from '../lib/utils/bin'
@@ -412,14 +413,13 @@ export default function ExperimentDetailPage() {
         </p>
       )}
 
-      {timelineLogs.some(
-        (l) =>
-          l.root_length_mm != null ||
-          l.new_leaves != null ||
-          (l.deaths_count ?? 0) > 0,
-      ) && (
-        <div className="mt-4">
-          <MeasurementsChart logs={timelineLogs} />
+      {timelineLogs.length > 0 && (
+        <div className="mt-4 flex flex-col gap-4">
+          <StageSnapshot
+            logs={timelineLogs}
+            startedCount={experiment.plant_count ?? null}
+          />
+          <StageChart logs={timelineLogs} />
         </div>
       )}
 
