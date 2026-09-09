@@ -1,4 +1,4 @@
-import { BarChart3, Loader2, Sprout, Timer, Trophy } from 'lucide-react'
+import { BarChart3, Layers, Loader2, Sprout, Timer, Trophy } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -205,6 +205,14 @@ export default function StatsPage() {
     [summaries],
   )
 
+  const activeSnapshots = useMemo(
+    () =>
+      summaries.filter(
+        (s) => s.experiment.status === 'ongoing' && s.snapshot != null,
+      ),
+    [summaries],
+  )
+
   if (loading) {
     return (
       <div className="flex justify-center py-16">
@@ -342,6 +350,61 @@ export default function StatsPage() {
           Breakdowns appear once you have at least two experiments with plant
           counts to compare.
         </p>
+      )}
+
+      {activeSnapshots.length > 0 && (
+        <div className="mt-4">
+        <Panel title="Latest stage snapshot — active experiments" icon={Layers}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-on-surface-variant">
+                <tr>
+                  <th className="pb-1 pr-2 font-medium">Experiment</th>
+                  <th className="pb-1 px-2 font-medium">Rooted</th>
+                  <th className="pb-1 px-2 font-medium">Any shoot</th>
+                  <th className="pb-1 px-2 font-medium">Established</th>
+                  <th className="pb-1 pl-2 font-medium">Leaf, no root</th>
+                </tr>
+              </thead>
+              <tbody className="text-on-surface">
+                {activeSnapshots.map((s) => {
+                  const snap = s.snapshot!
+                  return (
+                    <tr
+                      key={s.experiment.id}
+                      className="border-t border-outline-variant"
+                    >
+                      <td className="max-w-32 truncate py-1 pr-2">
+                        {s.experiment.title}
+                      </td>
+                      <td className="px-2 py-1">
+                        {snap.pctRooted == null
+                          ? '—'
+                          : `${Math.round(snap.pctRooted)}%`}
+                      </td>
+                      <td className="px-2 py-1">
+                        {snap.pctAnyShoot == null
+                          ? '—'
+                          : `${Math.round(snap.pctAnyShoot)}%`}
+                      </td>
+                      <td className="px-2 py-1">
+                        {snap.pctEstablished == null
+                          ? '—'
+                          : `${Math.round(snap.pctEstablished)}%`}
+                      </td>
+                      <td className="py-1 pl-2">
+                        {snap.entry.leafingWithoutRooting}
+                        {snap.pctLeafingWithoutRooting != null &&
+                          ` (${Math.round(snap.pctLeafingWithoutRooting)}%)`}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+        </div>
       )}
     </section>
   )

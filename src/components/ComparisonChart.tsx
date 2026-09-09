@@ -2,13 +2,13 @@ import {
   AXIS,
   GRID,
   LABEL,
-  dayMs,
   fmtDateMs,
   fmtTick,
   seriesColor,
   ticks,
 } from '../lib/utils/chart'
 import { survivalSeries } from '../lib/utils/insights'
+import { stageSnapshot } from '../lib/utils/stages'
 import type { DateLog, Experiment } from '../types/database'
 
 interface Props {
@@ -35,14 +35,65 @@ const M = { top: 10, right: 12, bottom: 46, left: 40 }
 const PW = VW - M.left - M.right
 const PH = VH - M.top - M.bottom
 
-function pointsFor(logs: DateLog[], metric: 'root_length_mm' | 'new_leaves') {
-  return logs
-    .map((l) => {
-      const value = l[metric]
-      return value == null ? null : { t: dayMs(l.log_date), value }
-    })
-    .filter((p): p is Point => p !== null)
-    .sort((a, b) => a.t - b.t)
+function fmtPct(n: number | null) {
+  return n == null ? '—' : `${Math.round(n)}%`
+}
+
+/** Latest stage snapshot per experiment, side by side. */
+function SnapshotTable({ experiments, logs }: Props) {
+  const byExp = new Map<string, DateLog[]>()
+  for (const log of logs) {
+    const list = byExp.get(log.experiment_id)
+    if (list) list.push(log)
+    else byExp.set(log.experiment_id, [log])
+  }
+
+  const rows = experiments
+    .map((exp) => ({
+      exp,
+      snap: stageSnapshot(byExp.get(exp.id) ?? [], exp.plant_count ?? null),
+    }))
+    .filter((r): r is { exp: Experiment; snap: NonNullable<typeof r.snap> } =>
+      Boolean(r.snap),
+    )
+
+  if (rows.length === 0) return null
+
+  return (
+    <figure className="min-w-0 overflow-x-auto rounded-lg bg-surface-container p-3">
+      <figcaption className="mb-2 text-xs text-on-surface-variant">
+        Latest snapshot — each experiment
+      </figcaption>
+      <table className="w-full text-left text-xs">
+        <thead className="text-on-surface-variant">
+          <tr>
+            <th className="pb-1 pr-2 font-medium">Experiment</th>
+            <th className="pb-1 px-2 font-medium">Rooted</th>
+            <th className="pb-1 px-2 font-medium">Any shoot</th>
+            <th className="pb-1 px-2 font-medium">Established</th>
+            <th className="pb-1 pl-2 font-medium">Leaf, no root</th>
+          </tr>
+        </thead>
+        <tbody className="text-on-surface">
+          {rows.map(({ exp, snap }) => (
+            <tr key={exp.id} className="border-t border-outline-variant">
+              <td className="max-w-32 truncate py-1 pr-2">{exp.title}</td>
+              <td className="px-2 py-1">{fmtPct(snap.pctRooted)}</td>
+              <td className="px-2 py-1">{fmtPct(snap.pctAnyShoot)}</td>
+              <td className="px-2 py-1">{fmtPct(snap.pctEstablished)}</td>
+              <td className="py-1 pl-2">
+                {snap.entry.leafingWithoutRooting}
+                <span className="text-on-surface-variant">
+                  {' '}
+                  ({fmtPct(snap.pctLeafingWithoutRooting)})
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
+  )
 }
 
 function MultiChart({
@@ -235,28 +286,19 @@ export default function ComparisonChart({ experiments, logs }: Props) {
     }))
 
   const survival = build((expLogs, exp) => survivalSeries(exp, expLogs))
-  const roots = build((expLogs) => pointsFor(expLogs, 'root_length_mm'))
-  const leaves = build((expLogs) => pointsFor(expLogs, 'new_leaves'))
-
-  const charts = [
-    { series: survival, title: 'Survival (%)', unit: '%', fixedMax: 100 },
-    { series: roots, title: 'Root length (mm)', unit: ' mm' },
-    { series: leaves, title: 'New leaves', unit: '' },
-  ].filter((c) => c.series.some((s) => s.points.length > 0))
-
-  if (charts.length === 0) return null
+  const hasSurvival = survival.some((s) => s.points.length > 0)
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {charts.map((c) => (
+      {hasSurvival && (
         <MultiChart
-          key={c.title}
-          series={c.series}
-          title={c.title}
-          unit={c.unit}
-          fixedMax={c.fixedMax}
+          series={survival}
+          title="Survival (%)"
+          unit="%"
+          fixedMax={100}
         />
-      ))}
+      )}
+      <SnapshotTable experiments={experiments} logs={logs} />
     </div>
   )
 }
