@@ -180,6 +180,12 @@ Working today:
 - PDF and CSV export, per experiment and per folder
 - **Bin** — deleting anything moves it to a bin you can restore from for 30 days,
   after which it and its photos are removed permanently
+- **Settings → Unused photos** — finds pictures in storage that no folder,
+  experiment, log entry or note points at any more (interrupted uploads, and
+  everything stranded before the bucket had a delete policy) and removes them.
+  Items in the bin count as in use, so nothing still restorable is touched, and
+  uploads from the last 24 hours are skipped in case they belong to a form you
+  have open.
 - Fertilizer log, pest reference, tips, and notes
 
 Photos are automatically shrunk before upload so saving stays fast.
@@ -189,22 +195,29 @@ transaction-wrapped, and you run them yourself in the Supabase SQL editor — th
 app expects the columns they add, so a new one has to be run before the features
 in that release will work.
 
-Three are currently outstanding — run them in date order.
+All of them have been run against the project. For the record, the two most
+recent:
 
-`db/2026-09-10_storage_policies.sql` fixes the `experiment-photos` bucket. It
+`db/2026-09-10_storage_policies.sql` fixed the `experiment-photos` bucket. It
 had an INSERT policy that only checked you were signed in (not which bucket or
 path), a public SELECT policy, and **no DELETE policy at all** — so
-`supabase.storage.remove()` was silently denied and the app has never actually
+`supabase.storage.remove()` was silently denied and the app never actually
 deleted a photo. The bin's 30-day purge left every image behind, and replacing a
 photo leaked the old one. The migration scopes writes to your own `<uid>/`
 prefix, adds the missing delete policy, and sets a 10 MB / JPEG-PNG limit on the
 bucket so the server enforces what `validateImage` checks in the client.
 
-`db/2026-09-10_not_null_invariants.sql` adds `not null` to columns the app
+`db/2026-09-10_not_null_invariants.sql` added `not null` to columns the app
 already treats as non-null (`date_logs.experiment_id`, the `created_at` /
 `updated_at` timestamps, `experiments.user_id`). They all have defaults and no
 row violates them today; this just stops the schema and
 `src/types/database.ts` disagreeing.
+
+Note that photos cannot be deleted with SQL: Supabase puts a `protect_delete`
+trigger on `storage.objects` that refuses direct `DELETE` ("Use the Storage API
+instead"), because removing the row would leave the actual file behind in S3.
+Anything that removes a photo has to go through the client, which is what
+**Settings → Unused photos** is for.
 
 `db/2026-09-09_pest_guide_images_per_user.sql` — already run. Pest
 reference photos move to their own owner-scoped table: `pest_guides` is seeded

@@ -176,3 +176,88 @@ export async function removeUnreferencedImages(urls: string[]): Promise<number> 
     return 0
   }
 }
+
+/** A file in the bucket that nothing in the database points at. */
+export interface OrphanedImage {
+  path: string
+  bytes: number
+  createdAt: string
+}
+
+/**
+ * Uploads that never made it onto a row, or were left behind before the bucket
+ * had a delete policy (see db/2026-09-10_storage_policies.sql — until that ran,
+ * every removal was silently denied by RLS).
+ *
+ * Two things keep this from eating live photos:
+ *
+ * - It compares against *every* row, binned ones included. A soft-deleted log
+ *   entry still owns its photo and can be restored for 30 days.
+ * - It ignores anything uploaded in the last `minAgeMs`. A photo is uploaded
+ *   before the row that references it is inserted, so a file that is seconds
+ *   old may simply belong to a form the user has not saved yet.
+ */
+export async function findOrphanedImages(
+  userId: string,
+  minAgeMs = 24 * 60 * 60 * 1000,
+): Promise<OrphanedImage[]> {
+  // Everything in this user's folder, paged.
+  const files: { name: string; bytes: number; createdAt: string }[] = []
+  const PAGE = 100
+  for (let offset = 0; ; offset += PAGE) {
+    const { data, error } = await supabase.storage
+      .from(BUCKET)
+      .list(userId, { limit: PAGE, offset })
+    if (error) throw error
+    const batch = data ?? []
+    for (const f of batch) {
+      files.push({
+        name: `${userId}/${f.name}`,
+        bytes: (f.metadata?.size as number | undefined) ?? 0,
+        createdAt: f.created_at ?? new Date(0).toISOString(),
+      })
+    }
+    if (batch.length < PAGE) break
+  }
+  if (files.length === 0) return []
+
+  // Every path any row still points at, as in-bucket paths.
+  const referenced = new Set<string>()
+  const results = await Promise.all(
+    IMAGE_COLUMNS.map(([table, column]) =>
+      supabase.from(table).select(column).not(column, 'is', null),
+    ),
+  )
+  for (const { data, error } of results) {
+    // Same rule as unreferencedUrls: a check we could not complete means we do
+    // not know what is referenced, so nothing is safe to call an orphan.
+    if (error) throw error
+    for (const row of (data ?? []) as unknown as Record<string, string | null>[]) {
+      for (const value of Object.values(row)) {
+        const path = value && storagePathFromUrl(value)
+        if (path) referenced.add(path)
+      }
+    }
+  }
+
+  const cutoff = Date.now() - minAgeMs
+  return files
+    .filter((f) => !referenced.has(f.name))
+    .filter((f) => new Date(f.createdAt).getTime() < cutoff)
+    .map((f) => ({ path: f.name, bytes: f.bytes, createdAt: f.createdAt }))
+}
+
+/** Delete the given in-bucket paths. Returns how many the API reported gone. */
+export async function deleteStoredPaths(paths: string[]): Promise<number> {
+  if (paths.length === 0) return 0
+  const { data, error } = await supabase.storage.from(BUCKET).remove(paths)
+  if (error) throw error
+  return data?.length ?? 0
+}
+
+/** Human-readable byte size for the maintenance readout. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
