@@ -43,6 +43,19 @@ export default defineConfig({
         // build, so there's no stale-cache risk. Nothing from Supabase is
         // cached: data is always fetched live.
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        // ...except the PDF export stack. ExperimentDetailPage dynamic-imports
+        // pdfExport precisely to keep jspdf + html2canvas (~780 kB raw) off the
+        // initial load, and a precache glob that swept them back in would undo
+        // that: every visitor would download the whole thing up front, and again
+        // after every deploy, whether or not they ever export anything. Workbox
+        // falls back to the network for these, which is what the dynamic import
+        // wants anyway.
+        globIgnores: [
+          '**/pdfExport-*.js',
+          '**/html2canvas-*.js',
+          '**/index.es-*.js',
+          '**/purify.es-*.js',
+        ],
         navigateFallback: '/index.html',
         cleanupOutdatedCaches: true,
         clientsClaim: true,

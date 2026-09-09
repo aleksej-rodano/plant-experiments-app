@@ -44,7 +44,13 @@ export default function AddDateLogPage() {
       if (cancelled) return
       if (expRes.error) setError(expRes.error.message)
       else if (expRes.data) setExperiment(expRes.data)
-      if (logRes.error) setError(logRes.error.message)
+      if (logRes.error) {
+        // Leave priorDeaths null so the form stays behind its spinner. Falling
+        // through to 0 would raise the death cap to the full plant count and
+        // let the user record losses that have already been recorded.
+        setError(logRes.error.message)
+        return
+      }
       setPriorDeaths(totalDeaths(logRes.data ?? []))
     })()
     return () => {
@@ -76,9 +82,11 @@ export default function AddDateLogPage() {
       {!id ? (
         <p className="text-sm text-error">Missing experiment id.</p>
       ) : priorDeaths == null ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-primary" />
-        </div>
+        error ? null : (
+          <div className="flex justify-center py-10">
+            <Loader2 className="size-5 animate-spin text-primary" />
+          </div>
+        )
       ) : (
         <DateLogForm
           experimentId={id}

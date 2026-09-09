@@ -30,9 +30,20 @@ interface Transform {
 export default function ImageLightbox({ src, alt = '', onClose }: Props) {
   const [loaded, setLoaded] = useState(false)
   const [t, setT] = useState<Transform>({ scale: 1, x: 0, y: 0 })
+  // State, not a ref: it decides whether the image animates between transforms,
+  // which is a rendering concern. Reading the gesture refs during render made
+  // the transition depend on a value React never saw change. Two extra renders
+  // per gesture (down, up) rather than one per frame.
+  const [gesturing, setGesturing] = useState(false)
 
+  // Mirrored into a ref so the pointer handlers read the current transform
+  // without being rebuilt on every frame. Written in an effect, not during
+  // render: a render React throws away must not leave the ref describing a
+  // transform that was never committed.
   const tRef = useRef(t)
-  tRef.current = t
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
   const imgRef = useRef<HTMLImageElement>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchDist = useRef<number | null>(null)
@@ -43,7 +54,9 @@ export default function ImageLightbox({ src, alt = '', onClose }: Props) {
 
   // Keep the latest onClose without re-running the wiring effect.
   const onCloseRef = useRef(onClose)
-  onCloseRef.current = onClose
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   // Esc closes; the Android hardware back button closes the viewer instead of
   // navigating the page away; body scroll is locked while open.
@@ -113,6 +126,7 @@ export default function ImageLightbox({ src, alt = '', onClose }: Props) {
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     moved.current = false
     downAt.current = Date.now()
+    setGesturing(true)
     if (pointers.current.size === 2) {
       pinchDist.current = twoPointerDist()
       panFrom.current = null
@@ -158,7 +172,10 @@ export default function ImageLightbox({ src, alt = '', onClose }: Props) {
       !moved.current && Date.now() - downAt.current < 400 && pointers.current.size <= 1
     pointers.current.delete(e.pointerId)
     if (pointers.current.size < 2) pinchDist.current = null
-    if (pointers.current.size === 0) panFrom.current = null
+    if (pointers.current.size === 0) {
+      panFrom.current = null
+      setGesturing(false)
+    }
 
     if (!wasTap) return
     const now = Date.now()
@@ -171,7 +188,7 @@ export default function ImageLightbox({ src, alt = '', onClose }: Props) {
       // A lone tap on the backdrop (not the zoomed image) closes.
       if (tRef.current.scale === 1) {
         window.setTimeout(() => {
-          if (lastTapAt.current === now) onClose()
+          if (lastTapAt.current === now) onCloseRef.current()
         }, DOUBLE_TAP_MS)
       }
     }
@@ -215,10 +232,7 @@ export default function ImageLightbox({ src, alt = '', onClose }: Props) {
         onLoad={() => setLoaded(true)}
         style={{
           transform: `translate(${t.x}px, ${t.y}px) scale(${t.scale})`,
-          transition:
-            pinchDist.current == null && !panFrom.current
-              ? 'transform 0.15s ease-out'
-              : 'none',
+          transition: gesturing ? 'none' : 'transform 0.15s ease-out',
           cursor: t.scale > 1 ? 'grab' : 'zoom-in',
         }}
         className="absolute inset-0 m-auto max-h-full max-w-full object-contain"

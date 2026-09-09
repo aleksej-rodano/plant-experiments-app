@@ -70,6 +70,8 @@ export default function EditDateLogPage() {
     return () => {
       cancelled = true
     }
+    // `navState` intentionally excluded — route state seeds the first render and
+    // then never changes for this mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, logId])
 

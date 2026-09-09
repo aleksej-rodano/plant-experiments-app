@@ -9,7 +9,10 @@
          the window has already been shrunk by adjustResize, so that padding is
          subtracted a second time and collapses the web view to a sliver. The
          status bar is kept off the web layer by StatusBar.setOverlaysWebView
-         instead; see src/lib/native/index.ts. -->
+         instead; see src/lib/native/index.ts. From Android 15 / targetSdk 35 up
+         that call is a no-op because the system forces edge-to-edge, so the
+         `.app-shell` safe-area padding in src/index.css carries the insets
+         there. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- PWA / add-to-home-screen. The manifest link is injected by

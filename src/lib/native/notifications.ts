@@ -44,6 +44,31 @@ function atHour(offsetDays: number): Date {
   return d
 }
 
+/** Drop every reminder we scheduled, without scheduling new ones. */
+async function cancelOurs(): Promise<void> {
+  const { LocalNotifications } = await import('@capacitor/local-notifications')
+  const pending = await LocalNotifications.getPending()
+  const ours = pending.notifications.filter(
+    (n) => typeof n.id === 'number' && n.id >= ID_BASE && n.id < ID_BASE + DAYS_AHEAD,
+  )
+  if (ours.length) await LocalNotifications.cancel({ notifications: ours })
+}
+
+/**
+ * Clear the scheduled reminders. Call this on sign-out: the schedule is built
+ * from one account's folders and experiments and lists them by name, so leaving
+ * it armed would show the previous user's plants on the lock screen at 11:00
+ * every morning for the next three weeks.
+ */
+export async function clearCareNotifications(): Promise<void> {
+  if (!isAndroid()) return
+  try {
+    await cancelOurs()
+  } catch {
+    // Plugin missing, permission race — not worth surfacing on the way out.
+  }
+}
+
 /**
  * Rebuild the local care reminders from the user's current schedules. A no-op on
  * anything but the Android app; safe to call as often as you like (fire and
@@ -61,11 +86,7 @@ export async function syncCareNotifications(): Promise<void> {
     }
 
     // Clear whatever we scheduled last time so stale days don't linger.
-    const pending = await LocalNotifications.getPending()
-    const ours = pending.notifications.filter(
-      (n) => typeof n.id === 'number' && n.id >= ID_BASE && n.id < ID_BASE + DAYS_AHEAD,
-    )
-    if (ours.length) await LocalNotifications.cancel({ notifications: ours })
+    await cancelOurs()
 
     const tasks = await collectTasks()
     if (tasks.length === 0) return

@@ -15,8 +15,9 @@ import { useKeyboardOpen } from '../lib/native/useKeyboardOpen'
 import { purgeExpired } from '../lib/utils/bin'
 
 // Module scope, not a ref: the sweep should run once per page load, not once per
-// mount (React StrictMode mounts twice in development).
-let sweptThisSession = false
+// mount (React StrictMode mounts twice in development). Keyed by user, so
+// signing in as somebody else on the same page load still sweeps their bin.
+let sweptFor: string | null = null
 
 // `label` shows in the desktop rail; `short` (when set) shows in the cramped
 // mobile bottom bar.
@@ -45,10 +46,10 @@ export default function Layout() {
   // Clear out anything past its 30-day restore window, photos included. Silent
   // by design: it's housekeeping, and a failure just means it retries next load.
   useEffect(() => {
-    if (!user || sweptThisSession) return
-    sweptThisSession = true
+    if (!user || sweptFor === user.id) return
+    sweptFor = user.id
     void purgeExpired().catch(() => {
-      sweptThisSession = false
+      sweptFor = null
     })
   }, [user])
 
@@ -57,8 +58,8 @@ export default function Layout() {
     // shrinks this window for the soft keyboard (adjustResize, set in the
     // manifest), so the 100% height follows it and <main> scrolls the focused
     // field into view. See useKeyboardOpen.
-    <div className="flex h-full flex-col overflow-hidden bg-background text-on-background">
-      <header className="flex shrink-0 items-center justify-between gap-3 bg-primary px-4 py-3 text-on-primary shadow-sm">
+    <div className="app-shell flex h-full flex-col overflow-hidden bg-background text-on-background">
+      <header className="safe-top flex shrink-0 items-center justify-between gap-3 bg-primary px-4 pb-3 text-on-primary shadow-sm">
         <div className="flex items-center gap-2">
           <Sprout className="size-6" />
           <span className="text-lg font-medium">Plant Experiments</span>

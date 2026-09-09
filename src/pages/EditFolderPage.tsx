@@ -1,11 +1,16 @@
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import CareScheduleFields from '../components/CareScheduleFields'
 import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
+import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
-import { CARE_TASK_SUGGESTIONS } from '../lib/utils/care'
-import { uploadImage, validateImage } from '../lib/utils/image'
+import {
+  removeUnreferencedImages,
+  uploadImage,
+  validateImage,
+} from '../lib/utils/image'
 import type { Database, Folder } from '../types/database'
 
 const inputClass =
@@ -37,6 +42,9 @@ export default function EditFolderPage() {
   // clearing sets `currentUrl` to '' so we know to null it out on save.
   const [image, setImage] = useState<File | null>(null)
   const [currentUrl, setCurrentUrl] = useState(seeded?.cover_image_url ?? '')
+  // The URL actually stored on the row right now — `currentUrl` is what the
+  // form will save, which the remove button clears to ''.
+  const storedUrl = useRef<string | null>(seeded?.cover_image_url ?? null)
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -73,6 +81,7 @@ export default function EditFolderPage() {
           data.care_interval_days != null ? String(data.care_interval_days) : '',
         )
         setCurrentUrl(data.cover_image_url ?? '')
+        storedUrl.current = data.cover_image_url ?? null
       }
       setLoading(false)
     })()
@@ -128,6 +137,7 @@ export default function EditFolderPage() {
 
     setBusy(true)
     try {
+      const previousUrl = storedUrl.current
       let coverUrl: string | null = currentUrl || null
       if (image) coverUrl = await uploadImage(image, user.id)
 
@@ -146,6 +156,15 @@ export default function EditFolderPage() {
         .update(payload)
         .eq('id', folderId)
       if (error) throw error
+      storedUrl.current = coverUrl
+      // The replaced (or removed) cover is now unreferenced.
+      if (previousUrl && previousUrl !== coverUrl) {
+        void removeUnreferencedImages([previousUrl])
+      }
+      // The Android reminder schedule is rebuilt from these columns. Without
+      // this, turning a reminder off here leaves the next three weeks of 11:00
+      // notifications armed for a task that no longer exists.
+      void syncCareNotifications()
       navigate(backTo, {
         replace: true,
         state: { toast: 'Folder updated.' },
@@ -247,52 +266,13 @@ export default function EditFolderPage() {
           />
         </label>
 
-        <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
-          <legend className="px-1 text-sm text-on-surface-variant">
-            Recurring reminder
-          </legend>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-              Task
-              <input
-                type="text"
-                list="care-task-suggestions"
-                value={careTask}
-                onChange={(e) => setCareTask(e.target.value)}
-                placeholder="e.g. Change water"
-                className={inputClass}
-              />
-              {errors.careTask && (
-                <span className="text-xs text-error">{errors.careTask}</span>
-              )}
-            </label>
-
-            <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-              Every … days
-              <input
-                type="number"
-                min={1}
-                step={1}
-                inputMode="numeric"
-                value={careInterval}
-                onChange={(e) => setCareInterval(e.target.value)}
-                placeholder="3"
-                className={inputClass}
-              />
-              {errors.careInterval && (
-                <span className="text-xs text-error">{errors.careInterval}</span>
-              )}
-            </label>
-          </div>
-          <datalist id="care-task-suggestions">
-            {CARE_TASK_SUGGESTIONS.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-          <p className="text-xs text-on-surface-variant">
-            Leave the days blank to turn the reminder off.
-          </p>
-        </fieldset>
+        <CareScheduleFields
+          task={careTask}
+          onTask={setCareTask}
+          interval={careInterval}
+          onInterval={setCareInterval}
+          error={errors.careInterval ?? errors.careTask}
+        />
 
         <CoverImagePicker
           image={image}

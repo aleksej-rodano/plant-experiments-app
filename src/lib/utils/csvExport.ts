@@ -1,12 +1,20 @@
 import type { DateLog, Experiment, Folder } from '../../types/database'
+import { today } from './date'
 
 /**
  * RFC 4180 field escaping: wrap in quotes when the value contains a comma,
  * quote, or newline, and double any embedded quotes.
+ *
+ * Values that open with =, +, - or @ are additionally prefixed with a single
+ * quote. Spreadsheets read those as the start of a formula whether or not the
+ * field is quoted, so a note typed as `=HYPERLINK(...)` would otherwise execute
+ * when the exported sheet is opened. The prefix is the standard neutraliser and
+ * is not displayed by Excel or Sheets.
  */
 function cell(value: unknown): string {
   if (value == null) return ''
-  const s = String(value)
+  let s = String(value)
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
@@ -25,7 +33,7 @@ function slugify(value: string) {
 }
 
 function stamp() {
-  return new Date().toISOString().slice(0, 10)
+  return today()
 }
 
 /** Trigger a client-side download of `text` as a CSV file. */
@@ -41,7 +49,9 @@ export function downloadCsv(text: string, filename: string): void {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  URL.revokeObjectURL(url)
+  // Deferred: revoking in the same tick cancels the download in some browsers,
+  // which have only queued the fetch by the time click() returns.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
 const LOG_HEADERS = [
@@ -82,14 +92,28 @@ function logCells(log: DateLog): unknown[] {
   ]
 }
 
-/** One row per log entry for a single experiment. */
+/** Oldest check-in first, ties broken by insertion order — as the PDF reads. */
+function chronological(logs: DateLog[]): DateLog[] {
+  return [...logs].sort(
+    (a, b) =>
+      a.log_date.localeCompare(b.log_date) ||
+      a.created_at.localeCompare(b.created_at),
+  )
+}
+
+/**
+ * One row per log entry for a single experiment.
+ *
+ * Sorts its own input: the caller may be handing over the timeline's list,
+ * which is newest-first for display.
+ */
 export function exportExperimentToCSV(
   experiment: Experiment,
   logs: DateLog[],
   folder?: Folder | null,
 ): void {
   const headers = ['folder', 'experiment', 'plant_count', ...LOG_HEADERS]
-  const rows = logs.map((log) => [
+  const rows = chronological(logs).map((log) => [
     folder?.title ?? '',
     experiment.title,
     experiment.plant_count,

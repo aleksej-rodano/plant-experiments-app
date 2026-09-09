@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- allowBackup="false": the Supabase session is kept in native
+         SharedPreferences (see src/lib/supabase.ts, which moved it off
+         localStorage so it survives cold start). Auto-backup would copy that
+         refresh token into the user's Google Drive backup and restore a live
+         signed-in session onto any device the backup lands on, and `adb backup`
+         would pull it off the device. There is nothing else here worth backing
+         up — all real data is in Supabase. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

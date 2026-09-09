@@ -5,7 +5,11 @@ import PhotoAnnotator from './PhotoAnnotator'
 import QuickCareButtons from './QuickCareButtons'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { uploadImage, validateImage } from '../lib/utils/image'
+import {
+  removeUnreferencedImages,
+  uploadImage,
+  validateImage,
+} from '../lib/utils/image'
 import {
   ROOT_STAGES,
   SHOOT_STAGES,
@@ -14,11 +18,10 @@ import {
 } from '../lib/utils/stages'
 import { DEATH_CAUSE_SUGGESTIONS } from '../lib/utils/survival'
 import type { DateLog } from '../types/database'
+import { today } from '../lib/utils/date'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 interface Props {
   experimentId: string
@@ -81,6 +84,8 @@ export default function DateLogForm({
   const [image, setImage] = useState<File | null>(null)
   const [marking, setMarking] = useState(false)
   const [currentUrl, setCurrentUrl] = useState(initial?.image_url ?? '')
+  // What the row stores today, as opposed to what the form is about to save.
+  const storedUrl = useRef<string | null>(initial?.image_url ?? null)
   const [newPreviewUrl, setNewPreviewUrl] = useState<string | null>(null)
   // Two separate inputs: one forces the camera, one opens the file/gallery picker.
   const cameraRef = useRef<HTMLInputElement>(null)
@@ -111,8 +116,8 @@ export default function DateLogForm({
       leafing_without_rooting: leafingNoRoot.trim() ? Number(leafingNoRoot) : 0,
     } as unknown as DateLog
     const entry = stageEntry(draft)
-    return entry ? stageWarnings(entry, plantCount) : []
-  }, [stagesTouched, stages, deaths, leafingNoRoot, plantCount])
+    return entry ? stageWarnings(entry, plantCount, priorDeaths) : []
+  }, [stagesTouched, stages, deaths, leafingNoRoot, plantCount, priorDeaths])
 
   useEffect(() => {
     if (!image) {
@@ -228,6 +233,7 @@ export default function DateLogForm({
 
     setBusy(true)
     try {
+      const previousUrl = storedUrl.current
       let imageUrl: string | null = currentUrl || null
       if (image) imageUrl = await uploadImage(image, user.id)
 
@@ -266,6 +272,14 @@ export default function DateLogForm({
           .from('date_logs')
           .insert({ experiment_id: experimentId, ...fields })
         if (error) throw error
+      }
+
+      storedUrl.current = imageUrl
+      // Tidy up the photo this entry no longer points at — but only if nothing
+      // else does. A folder-wide entry writes one upload onto a row per
+      // experiment, so the same URL can still be live in other timelines.
+      if (previousUrl && previousUrl !== imageUrl) {
+        void removeUnreferencedImages([previousUrl])
       }
 
       navigate(backTo, {

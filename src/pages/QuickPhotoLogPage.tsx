@@ -6,8 +6,7 @@ import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Experiment, Folder } from '../types/database'
-
-const today = () => new Date().toISOString().slice(0, 10)
+import { today } from '../lib/utils/date'
 
 /**
  * The fast path for the common case: a photo *is* the update. Shoot, save, done —

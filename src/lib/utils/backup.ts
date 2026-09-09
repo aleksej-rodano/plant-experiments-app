@@ -64,5 +64,7 @@ export function downloadJson(obj: unknown, filename: string): void {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  URL.revokeObjectURL(url)
+  // Deferred: revoking in the same tick cancels the download in some browsers,
+  // which have only queued the fetch by the time click() returns.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }

@@ -2,14 +2,18 @@ import { BarChart3, Layers, Loader2, Sprout, Timer, Trophy } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { summariseAll, type ExperimentSummary } from '../lib/utils/insights'
+import {
+  summariseAll,
+  type ExperimentSummary,
+  type SummaryLog,
+} from '../lib/utils/insights'
 import {
   SURVIVAL_TEXT_CLASS,
   SURVIVAL_TILE_CLASS,
   formatRate,
   survivalLevel,
 } from '../lib/utils/survival'
-import type { DateLog, Experiment, Folder } from '../types/database'
+import type { Experiment, Folder } from '../types/database'
 
 /** Middle value of a sorted copy; even counts take the lower of the two middles. */
 function median(values: number[]): number | null {
@@ -31,16 +35,21 @@ interface Group {
  * Roll summaries up by an arbitrary label (folder title, origin, …). Grouping is
  * case-insensitive so "WDWD" and "wdwd" count as one treatment, but the label
  * shown is the first spelling encountered rather than the lowercased key.
+ *
+ * `key` defaults to the label itself; pass one explicitly where the label is not
+ * the identity (folders, which can share a title).
  */
 function groupBy(
   summaries: ExperimentSummary[],
   label: (s: ExperimentSummary) => string | null,
+  displayLabel?: (s: ExperimentSummary) => string | null,
 ): Group[] {
   const map = new Map<string, Group>()
   for (const s of summaries) {
-    const raw = label(s)
-    if (!raw || s.initial == null || s.initial <= 0) continue
-    const key = raw.toLowerCase()
+    const raw = (displayLabel ?? label)(s)
+    const id = label(s)
+    if (!raw || !id || s.initial == null || s.initial <= 0) continue
+    const key = displayLabel ? id : raw.toLowerCase()
     const g = map.get(key) ?? {
       key: raw,
       plants: 0,
@@ -109,7 +118,7 @@ function Panel({
 export default function StatsPage() {
   const [folders, setFolders] = useState<Folder[]>([])
   const [experiments, setExperiments] = useState<Experiment[]>([])
-  const [logs, setLogs] = useState<DateLog[]>([])
+  const [logs, setLogs] = useState<SummaryLog[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -131,8 +140,13 @@ export default function StatsPage() {
           .is('deleted_at', null)
           .abortSignal(controller.signal),
         supabase
+          // Only the columns the summaries actually read. `select()` pulled
+          // every note body and photo URL the account has ever written, on a
+          // page that shows none of them.
           .from('date_logs')
-          .select()
+          .select(
+            'experiment_id, log_date, created_at, deaths_count, r0_count, r1_count, r2_count, s0_count, s1_count, s2_count, s3_count, leafing_without_rooting',
+          )
           .is('deleted_at', null)
           .abortSignal(controller.signal),
       ])
@@ -185,10 +199,14 @@ export default function StatsPage() {
     [folders],
   )
 
+  // Keyed on folder_id, not title: two folders can share a name, and grouping
+  // by the label would silently merge them into one bar.
   const byFolder = useMemo(
     () =>
-      groupBy(summaries, (s) =>
-        folderTitles.get(s.experiment.folder_id) ?? null,
+      groupBy(
+        summaries,
+        (s) => s.experiment.folder_id,
+        (s) => folderTitles.get(s.experiment.folder_id) ?? null,
       ),
     [summaries, folderTitles],
   )

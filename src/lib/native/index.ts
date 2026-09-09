@@ -1,6 +1,7 @@
 import { Capacitor } from '@capacitor/core'
 
 export {
+  clearCareNotifications,
   syncCareNotifications,
   useCareNotificationsSync,
 } from './notifications'

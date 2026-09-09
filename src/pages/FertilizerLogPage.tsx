@@ -3,11 +3,10 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import type { FeedingLog } from '../types/database'
+import { today } from '../lib/utils/date'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 function formatDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
@@ -143,6 +142,7 @@ export default function FertilizerLogPage() {
     }
   }
 
+  /** Hard delete: feeding_logs is not part of the bin (no soft-delete columns). */
   async function handleDelete(id: string) {
     const { error } = await supabase.from('feeding_logs').delete().eq('id', id)
     if (error) {
@@ -243,6 +243,12 @@ export default function FertilizerLogPage() {
               </div>
               {pendingDelete === entry.id ? (
                 <span className="flex shrink-0 items-center gap-2">
+                  {/* Feeding logs have no soft-delete columns and so skip the
+                      bin entirely — unlike folders, experiments, log entries
+                      and notes, this really is gone. Say so. */}
+                  <span className="text-xs text-on-surface-variant">
+                    Delete permanently?
+                  </span>
                   <button
                     type="button"
                     onClick={() => setPendingDelete(null)}

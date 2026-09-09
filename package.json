@@ -11,7 +11,9 @@
     "cap:sync": "npm run build && npx cap sync",
     "android": "npm run build && npx cap sync android && npx cap open android",
     "apk": "npm run build && npx cap sync android && android\\gradlew.bat -p android assembleDebug",
-    "apk:install": "npm run apk && adb install -r android/app/build/outputs/apk/debug/app-debug.apk"
+    "apk:install": "npm run apk && adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
@@ -42,6 +44,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.2.2",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^5.0.0"
   }
 }

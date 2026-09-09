@@ -5,14 +5,21 @@ import PestTreatmentGuide, {
 } from '../components/PestTreatmentGuide'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
-import { uploadImage, validateImage } from '../lib/utils/image'
+import {
+  removeUnreferencedImages,
+  uploadImage,
+  validateImage,
+} from '../lib/utils/image'
 import type { PestGuide } from '../types/database'
 
 function PestPhoto({
   guide,
+  imageUrl,
   onImage,
 }: {
   guide: PestGuide
+  /** This user's own photo, falling back to the seeded shared one. */
+  imageUrl: string | null
   onImage: (id: string, url: string) => void
 }) {
   const { user } = useAuth()
@@ -31,12 +38,28 @@ function PestPhoto({
     setBusy(true)
     try {
       const url = await uploadImage(file, user.id)
+      // Own row, not the shared pest_guides column: that table is seeded
+      // reference content every account reads, so one user's photo must not
+      // replace it for everyone else.
       const { error } = await supabase
-        .from('pest_guides')
-        .update({ image_url: url })
-        .eq('id', guide.id)
+        .from('pest_guide_images')
+        .upsert(
+          {
+            user_id: user.id,
+            pest_guide_id: guide.id,
+            image_url: url,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,pest_guide_id' },
+        )
       if (error) throw error
+      const replaced = imageUrl
       onImage(guide.id, url)
+      // Drop the file we just replaced, unless something still points at it —
+      // the seeded shared URL, for one, belongs to everybody.
+      if (replaced && replaced !== url) {
+        void removeUnreferencedImages([replaced])
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed.')
     } finally {
@@ -54,10 +77,10 @@ function PestPhoto({
         className="hidden"
         onChange={(e) => void pick(e.target.files?.[0])}
       />
-      {guide.image_url ? (
+      {imageUrl ? (
         <figure>
           <img
-            src={guide.image_url}
+            src={imageUrl}
             alt={`${guide.pest_name} reference photo`}
             className="w-2/3 max-w-xs rounded-lg object-cover ring-1 ring-outline-variant"
             loading="lazy"
@@ -95,6 +118,8 @@ function PestPhoto({
 
 export default function PestControlPage() {
   const [guides, setGuides] = useState<PestGuide[]>([])
+  /** This user's own reference photos, keyed by pest_guide_id. */
+  const [ownImages, setOwnImages] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -105,13 +130,25 @@ export default function PestControlPage() {
     const controller = new AbortController()
     const abortTimer = setTimeout(() => controller.abort(), 15000)
     try {
-      const { data, error } = await supabase
-        .from('pest_guides')
-        .select()
-        .order('created_at', { ascending: true })
-        .abortSignal(controller.signal)
-      if (error) throw error
-      setGuides(data ?? [])
+      const [guideRes, imageRes] = await Promise.all([
+        supabase
+          .from('pest_guides')
+          .select()
+          .order('created_at', { ascending: true })
+          .abortSignal(controller.signal),
+        supabase
+          .from('pest_guide_images')
+          .select('pest_guide_id, image_url')
+          .abortSignal(controller.signal),
+      ])
+      if (guideRes.error) throw guideRes.error
+      if (imageRes.error) throw imageRes.error
+      setGuides(guideRes.data ?? [])
+      setOwnImages(
+        Object.fromEntries(
+          (imageRes.data ?? []).map((r) => [r.pest_guide_id, r.image_url]),
+        ),
+      )
     } catch (e) {
       setError(
         controller.signal.aborted
@@ -131,9 +168,7 @@ export default function PestControlPage() {
   }, [load])
 
   function setImage(id: string, url: string) {
-    setGuides((prev) =>
-      prev.map((g) => (g.id === id ? { ...g, image_url: url } : g)),
-    )
+    setOwnImages((prev) => ({ ...prev, [id]: url }))
   }
 
   return (
@@ -196,7 +231,11 @@ export default function PestControlPage() {
                     id={`pest-panel-${guide.id}`}
                     className="border-t border-outline-variant px-4 py-4"
                   >
-                    <PestPhoto guide={guide} onImage={setImage} />
+                    <PestPhoto
+                      guide={guide}
+                      imageUrl={ownImages[guide.id] ?? guide.image_url}
+                      onImage={setImage}
+                    />
 
                     {guide.treatment_steps.length > 0 && (
                       <>

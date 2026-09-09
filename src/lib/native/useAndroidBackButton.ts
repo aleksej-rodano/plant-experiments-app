@@ -30,7 +30,15 @@ export function useAndroidBackButton(): void {
   useEffect(() => {
     if (Capacitor.getPlatform() !== 'android') return
 
+    // The effect re-runs on every navigation, but the listener is registered
+    // after an await. Without this flag a cleanup that lands during that gap —
+    // the first load, where the chunk is still being fetched, or StrictMode's
+    // double mount — would find nothing to remove, and the listener would
+    // register anyway and outlive its effect. Stacked listeners make one back
+    // press navigate twice, or exit the app from under an open overlay.
+    let disposed = false
     let remove: (() => void) | undefined
+
     void import('@capacitor/app').then(({ App }) => {
       const handle = App.addListener('backButton', () => {
         // Let an open overlay (e.g. the photo viewer) swallow the press first.
@@ -47,8 +55,12 @@ export function useAndroidBackButton(): void {
       remove = () => {
         void handle.then((h) => h.remove())
       }
+      if (disposed) remove()
     })
 
-    return () => remove?.()
+    return () => {
+      disposed = true
+      remove?.()
+    }
   }, [navigate, location.pathname])
 }

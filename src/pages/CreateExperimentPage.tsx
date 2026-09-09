@@ -8,11 +8,10 @@ import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Database } from '../types/database'
+import { today } from '../lib/utils/date'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 export default function CreateExperimentPage() {
   const { folderId } = useParams<{ folderId: string }>()

@@ -174,6 +174,28 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['pest_guides']['Insert']>
         Relationships: []
       }
+      pest_guide_images: {
+        Row: {
+          id: string
+          user_id: string
+          pest_guide_id: string
+          image_url: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          pest_guide_id: string
+          image_url: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<
+          Database['public']['Tables']['pest_guide_images']['Insert']
+        >
+        Relationships: []
+      }
       tips: {
         Row: {
           id: string
@@ -248,6 +270,8 @@ export type Folder = Database['public']['Tables']['folders']['Row']
 export type Experiment = Database['public']['Tables']['experiments']['Row']
 export type DateLog = Database['public']['Tables']['date_logs']['Row']
 export type PestGuide = Database['public']['Tables']['pest_guides']['Row']
+export type PestGuideImage =
+  Database['public']['Tables']['pest_guide_images']['Row']
 export type Tip = Database['public']['Tables']['tips']['Row']
 export type Note = Database['public']['Tables']['notes']['Row']
 export type FeedingLog = Database['public']['Tables']['feeding_logs']['Row']

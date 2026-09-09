@@ -25,7 +25,11 @@ export function useKeyboardOpen(): boolean {
   useEffect(() => {
     if (Capacitor.getPlatform() !== 'android') return
 
+    // See useAndroidBackButton: the listeners are registered after an await, so
+    // a cleanup arriving first has to be remembered rather than dropped.
+    let disposed = false
     let cleanup: (() => void) | undefined
+
     void import('@capacitor/keyboard').then(({ Keyboard }) => {
       const show = Keyboard.addListener('keyboardWillShow', () => setOpen(true))
       const hide = Keyboard.addListener('keyboardWillHide', () => setOpen(false))
@@ -33,9 +37,13 @@ export function useKeyboardOpen(): boolean {
         void show.then((h) => h.remove())
         void hide.then((h) => h.remove())
       }
+      if (disposed) cleanup()
     })
 
-    return () => cleanup?.()
+    return () => {
+      disposed = true
+      cleanup?.()
+    }
   }, [])
 
   return open

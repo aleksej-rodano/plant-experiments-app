@@ -112,7 +112,7 @@ export default function FolderDetailPage() {
         if (exps.length > 0) {
           // Full rows (not just deaths): the comparison charts, the verdict, and
           // the CSV export all read from this one fetch.
-          const { data: logRows } = await supabase
+          const { data: logRows, error: logErr } = await supabase
             .from('date_logs')
             .select()
             .in(
@@ -122,6 +122,10 @@ export default function FolderDetailPage() {
             .is('deleted_at', null)
             .order('log_date', { ascending: true })
             .abortSignal(controller.signal)
+          // Swallowing this would show an empty timeline as fact: every survival
+          // figure on the page would read 0 alive, the charts and verdict would
+          // vanish, and Export CSV would write a file with no log entries in it.
+          if (logErr) throw logErr
           setLogs(logRows ?? [])
         } else {
           setLogs([])

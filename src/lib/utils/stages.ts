@@ -1,6 +1,26 @@
 import type { DateLog, Experiment } from '../../types/database'
 import { dayMs } from './chart'
 
+/**
+ * The columns of a log row the stage maths reads — nothing else is touched, so
+ * callers are free to fetch a projection instead of the whole row. Mirrors what
+ * `survival.ts` already does for `deaths_count`.
+ */
+export type StageLog = Pick<
+  DateLog,
+  | 'log_date'
+  | 'created_at'
+  | 'deaths_count'
+  | 'r0_count'
+  | 'r1_count'
+  | 'r2_count'
+  | 's0_count'
+  | 's1_count'
+  | 's2_count'
+  | 's3_count'
+  | 'leafing_without_rooting'
+>
+
 const DAY = 86_400_000
 
 /**
@@ -41,7 +61,7 @@ export interface StageEntry {
 }
 
 /** Null when this check-in recorded no stage counts at all. */
-export function stageEntry(log: DateLog): StageEntry | null {
+export function stageEntry(log: StageLog): StageEntry | null {
   const hasRoot = ROOT_KEYS.some((k) => log[k] != null)
   const hasShoot = SHOOT_KEYS.some((k) => log[k] != null)
   if (!hasRoot && !hasShoot) return null
@@ -63,12 +83,12 @@ export function stageEntry(log: DateLog): StageEntry | null {
   }
 }
 
-export function hasStageData(log: DateLog): boolean {
+export function hasStageData(log: StageLog): boolean {
   return stageEntry(log) !== null
 }
 
 /** Most recent check-in (by date, then insertion order) that carries stage counts. */
-export function latestStageLog(logs: DateLog[]): DateLog | null {
+export function latestStageLog<T extends StageLog>(logs: T[]): T | null {
   const withStages = logs.filter(hasStageData)
   if (withStages.length === 0) return null
   return [...withStages].sort((a, b) =>
@@ -83,7 +103,7 @@ export function latestStageLog(logs: DateLog[]): DateLog | null {
 }
 
 export interface StageSnapshot {
-  log: DateLog
+  log: StageLog
   entry: StageEntry
   /** Plants the experiment started with — the % denominator, or null if unset. */
   started: number | null
@@ -101,7 +121,7 @@ export interface StageSnapshot {
 }
 
 export function stageSnapshot(
-  logs: DateLog[],
+  logs: StageLog[],
   startedCount: number | null,
 ): StageSnapshot | null {
   const log = latestStageLog(logs)
@@ -128,22 +148,30 @@ export function stageSnapshot(
 /**
  * Soft reconciliation checks — every message is a nudge to double-check entry,
  * never a reason to block saving. Lag between counting the two tracks is normal.
+ *
+ * `priorDeaths` is what earlier check-ins already recorded as lost. It has to be
+ * part of the sum: the bucket counts are the *current* living population, so on
+ * an experiment that started with 10 and lost 2 last week, this week's honest
+ * entry is 8 in the buckets and 0 new deaths. Reconciling against this entry's
+ * deaths alone would flag every check-in after the first loss.
  */
 export function stageWarnings(
   entry: StageEntry,
   startedCount: number | null,
+  priorDeaths = 0,
 ): string[] {
   const out: string[] = []
   const started = startedCount ?? null
 
   if (started != null) {
-    const rootSum = entry.rootTotal + entry.dead
+    const dead = entry.dead + priorDeaths
+    const rootSum = entry.rootTotal + dead
     if (rootSum !== started) {
       out.push(
         `Root buckets + dead = ${rootSum}, but the experiment started with ${started}.`,
       )
     }
-    const shootSum = entry.shootTotal + entry.dead
+    const shootSum = entry.shootTotal + dead
     if (shootSum !== started) {
       out.push(
         `Shoot buckets + dead = ${shootSum}, but the experiment started with ${started}.`,
@@ -170,7 +198,7 @@ export interface StageTrendPoint {
 }
 
 /** Stage distribution per check-in, oldest first — the input to the trend charts. */
-export function stageTrend(logs: DateLog[]): StageTrendPoint[] {
+export function stageTrend(logs: StageLog[]): StageTrendPoint[] {
   return logs
     .map((l) => {
       const e = stageEntry(l)
@@ -186,7 +214,7 @@ export function stageTrend(logs: DateLog[]): StageTrendPoint[] {
  */
 export function daysToStage(
   experiment: Experiment,
-  logs: DateLog[],
+  logs: StageLog[],
   reached: (entry: StageEntry) => boolean,
 ): number | null {
   const dates = logs

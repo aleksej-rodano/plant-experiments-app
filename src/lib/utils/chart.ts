@@ -1,13 +1,12 @@
 /** Geometry and formatting shared by the measurement and comparison charts. */
 
+import { dayMs } from './date'
+
+export { dayMs }
+
 export const GRID = 'var(--color-outline-variant, #c2c9bd)'
 export const AXIS = 'var(--color-outline, #72796f)'
 export const LABEL = 'var(--color-on-surface-variant, #424940)'
-
-/** An ISO `yyyy-mm-dd` as epoch ms, read as local midnight. */
-export function dayMs(iso: string) {
-  return new Date(`${iso}T00:00:00`).getTime()
-}
 
 export function fmtDate(iso: string) {
   return fmtDateMs(dayMs(iso))

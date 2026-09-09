@@ -1,6 +1,6 @@
-import { daysBetween } from './insights'
+import { addDays, daysBetween, today } from './date'
 
-export const today = () => new Date().toISOString().slice(0, 10)
+export { today }
 
 /**
  * The three columns that describe a recurring chore. Both `folders` and
@@ -24,14 +24,6 @@ export interface CareStatus {
   text: string
 }
 
-function addDays(iso: string, days: number) {
-  const d = new Date(`${iso}T00:00:00`)
-  d.setDate(d.getDate() + days)
-  // Format from local parts: toISOString() would shift the date across timezones.
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
 /**
  * Where a recurring chore stands right now, for a folder or an experiment. Null
  * when no schedule is set up.
@@ -41,10 +33,14 @@ export function careStatus(row: CareSchedule): CareStatus | null {
   if (!interval || interval <= 0) return null
 
   const label = row.care_task_label?.trim() || 'Care task'
-  // Never done yet: treat it as due today so it doesn't sit invisible forever.
-  const from = row.care_last_done_on ?? today()
-  const dueOn = addDays(from, interval)
-  const daysUntilDue = daysBetween(today(), dueOn) ?? 0
+  const now = today()
+  // Never done yet: due today. Anchoring on `today()` instead would re-derive
+  // the due date from a moving base every render, pushing it forward one day
+  // every day -- the task would read "due in N days" forever and never fire.
+  const dueOn = row.care_last_done_on
+    ? addDays(row.care_last_done_on, interval)
+    : now
+  const daysUntilDue = daysBetween(now, dueOn) ?? 0
 
   const state =
     daysUntilDue < 0 ? 'overdue' : daysUntilDue === 0 ? 'due' : 'upcoming'

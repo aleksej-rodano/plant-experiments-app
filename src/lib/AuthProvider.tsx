@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { AuthContext, type AuthContextValue } from './auth-context'
-import { isNativeApp } from './native'
+import { clearCareNotifications, isNativeApp } from './native'
 import { supabase } from './supabase'
 
 // The hosted web app handles the reset link even when the request came from the
@@ -91,6 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { needsEmailConfirmation: data.session === null }
       },
       signOut: async () => {
+        // Before the session goes: the Android reminder schedule is built from
+        // this account's folders and names them in the notification body.
+        await clearCareNotifications()
         const { error } = await supabase.auth.signOut()
         if (error) throw error
       },

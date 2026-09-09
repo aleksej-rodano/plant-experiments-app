@@ -50,40 +50,55 @@ export default function DateLogTimeline({
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [zoomedUrl, setZoomedUrl] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setError(null)
-    const controller = new AbortController()
-    const abortTimer = setTimeout(() => controller.abort(), 12000)
-    try {
-      const { data, error } = await supabase
-        .from('date_logs')
-        .select()
-        .eq('experiment_id', experimentId)
-        .is('deleted_at', null)
-        .order('log_date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .abortSignal(controller.signal)
-      if (error) throw error
-      if (data) {
-        setLogs(data)
-        onLogsChange?.(data)
+  const load = useCallback(
+    async (signal?: AbortSignal) => {
+      setError(null)
+      const controller = new AbortController()
+      const abortTimer = setTimeout(() => controller.abort(), 12000)
+      // Unmounting, or switching to another experiment, cancels the request as
+      // well as the timeout.
+      const stop = () => controller.abort()
+      signal?.addEventListener('abort', stop)
+      try {
+        const { data, error } = await supabase
+          .from('date_logs')
+          .select()
+          .eq('experiment_id', experimentId)
+          .is('deleted_at', null)
+          .order('log_date', { ascending: false })
+          .order('created_at', { ascending: false })
+          .abortSignal(controller.signal)
+        // Without this a slow response for the experiment we just navigated
+        // away from would overwrite the one now on screen — and push its logs
+        // into the parent's stage charts and survival header via onLogsChange.
+        if (signal?.aborted) return
+        if (error) throw error
+        if (data) {
+          setLogs(data)
+          onLogsChange?.(data)
+        }
+      } catch (e) {
+        if (signal?.aborted) return
+        setError(
+          controller.signal.aborted
+            ? 'The server took too long to respond.'
+            : e instanceof Error
+              ? e.message
+              : 'Failed to load the timeline.',
+        )
+      } finally {
+        signal?.removeEventListener('abort', stop)
+        clearTimeout(abortTimer)
+        if (!signal?.aborted) setLoading(false)
       }
-    } catch (e) {
-      setError(
-        controller.signal.aborted
-          ? 'The server took too long to respond.'
-          : e instanceof Error
-            ? e.message
-            : 'Failed to load the timeline.',
-      )
-    } finally {
-      clearTimeout(abortTimer)
-      setLoading(false)
-    }
-  }, [experimentId, onLogsChange])
+    },
+    [experimentId, onLogsChange],
+  )
 
   useEffect(() => {
-    void load()
+    const controller = new AbortController()
+    void load(controller.signal)
+    return () => controller.abort()
   }, [load])
 
   async function handleDelete(logId: string) {

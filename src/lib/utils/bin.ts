@@ -1,6 +1,6 @@
 import type { DateLog, Experiment, Folder, Note } from '../../types/database'
 import { supabase } from '../supabase'
-import { removeStoredImages } from './image'
+import { removeUnreferencedImages } from './image'
 
 /** How long a binned item can be restored before it's purged for good. */
 export const RETENTION_DAYS = 30
@@ -8,13 +8,14 @@ export const RETENTION_DAYS = 30
 /** Tables that participate in the bin, in parent-to-child order. */
 export type BinKind = 'folder' | 'experiment' | 'date_log' | 'note'
 
-const TABLE: Record<BinKind, 'folders' | 'experiments' | 'date_logs' | 'notes'> =
-  {
-    folder: 'folders',
-    experiment: 'experiments',
-    date_log: 'date_logs',
-    note: 'notes',
-  }
+type BinTable = 'folders' | 'experiments' | 'date_logs' | 'notes'
+
+const TABLE: Record<BinKind, BinTable> = {
+  folder: 'folders',
+  experiment: 'experiments',
+  date_log: 'date_logs',
+  note: 'notes',
+}
 
 export interface BinEntry {
   kind: BinKind
@@ -37,6 +38,26 @@ function daysLeft(deletedAt: string): number {
   return Math.max(0, Math.ceil(RETENTION_DAYS - elapsed))
 }
 
+/** Reset the soft-delete bookkeeping — the inverse of `stampFields`. */
+const CLEAR = { deleted_at: null, delete_batch_id: null, deleted_root: false }
+
+/**
+ * Undo a partly-applied bin. These sequences are several statements against
+ * different tables with no transaction around them, so a failure halfway
+ * through would otherwise leave children binned under a parent that is still
+ * live — and, before `listBin` learned to group by batch, invisible.
+ *
+ * Best effort: if the rollback itself fails the rows are still recoverable,
+ * because the whole batch shares one id and `listBin` surfaces it.
+ */
+async function rollbackBatch(batch: string): Promise<void> {
+  await Promise.all(
+    (['date_logs', 'experiments', 'folders'] as const).map((table) =>
+      supabase.from(table).update(CLEAR).eq('delete_batch_id', batch),
+    ),
+  ).catch(() => undefined)
+}
+
 /**
  * Move a folder and everything under it to the bin. Children are stamped first,
  * while they're still findable as live rows, and share the folder's batch id so
@@ -54,26 +75,31 @@ export async function binFolder(folderId: string): Promise<void> {
   if (expErr) throw expErr
 
   const expIds = (exps ?? []).map((e) => e.id)
-  if (expIds.length > 0) {
+  try {
+    if (expIds.length > 0) {
+      const { error } = await supabase
+        .from('date_logs')
+        .update(stampFields(batch, at, false))
+        .in('experiment_id', expIds)
+        .is('deleted_at', null)
+      if (error) throw error
+
+      const { error: e2 } = await supabase
+        .from('experiments')
+        .update(stampFields(batch, at, false))
+        .in('id', expIds)
+      if (e2) throw e2
+    }
+
     const { error } = await supabase
-      .from('date_logs')
-      .update(stampFields(batch, at, false))
-      .in('experiment_id', expIds)
-      .is('deleted_at', null)
+      .from('folders')
+      .update(stampFields(batch, at, true))
+      .eq('id', folderId)
     if (error) throw error
-
-    const { error: e2 } = await supabase
-      .from('experiments')
-      .update(stampFields(batch, at, false))
-      .in('id', expIds)
-    if (e2) throw e2
+  } catch (e) {
+    await rollbackBatch(batch)
+    throw e
   }
-
-  const { error } = await supabase
-    .from('folders')
-    .update(stampFields(batch, at, true))
-    .eq('id', folderId)
-  if (error) throw error
 }
 
 /** Move an experiment and its log entries to the bin. */
@@ -81,18 +107,23 @@ export async function binExperiment(experimentId: string): Promise<void> {
   const batch = crypto.randomUUID()
   const at = new Date().toISOString()
 
-  const { error: logErr } = await supabase
-    .from('date_logs')
-    .update(stampFields(batch, at, false))
-    .eq('experiment_id', experimentId)
-    .is('deleted_at', null)
-  if (logErr) throw logErr
+  try {
+    const { error: logErr } = await supabase
+      .from('date_logs')
+      .update(stampFields(batch, at, false))
+      .eq('experiment_id', experimentId)
+      .is('deleted_at', null)
+    if (logErr) throw logErr
 
-  const { error } = await supabase
-    .from('experiments')
-    .update(stampFields(batch, at, true))
-    .eq('id', experimentId)
-  if (error) throw error
+    const { error } = await supabase
+      .from('experiments')
+      .update(stampFields(batch, at, true))
+      .eq('id', experimentId)
+    if (error) throw error
+  } catch (e) {
+    await rollbackBatch(batch)
+    throw e
+  }
 }
 
 /** Move a single row with no children (a log entry or a note) to the bin. */
@@ -104,10 +135,9 @@ export async function binRow(
     .from(TABLE[kind])
     .update(stampFields(crypto.randomUUID(), new Date().toISOString(), true))
     .eq('id', id)
+    .is('deleted_at', null)
   if (error) throw error
 }
-
-const CLEAR = { deleted_at: null, delete_batch_id: null, deleted_root: false }
 
 /**
  * Put a whole batch back. A folder restore also revives its experiments and
@@ -128,6 +158,11 @@ export async function restoreBatch(batchId: string): Promise<void> {
  * Bring back any still-binned parent of what we just restored. Without this,
  * restoring an experiment that was binned *before* its folder was would put the
  * row back inside an invisible folder — restored, but nowhere to be seen.
+ *
+ * A revived parent loses its own batch stamp, which strands whatever else went
+ * down with it: those rows keep `deleted_at` but no longer have a `deleted_root`
+ * row to represent them. `listBin` groups by batch precisely so that set still
+ * shows up (under its shallowest surviving row) and stays restorable.
  */
 async function reviveAncestors(batchId: string): Promise<void> {
   const { data: logs } = await supabase
@@ -172,7 +207,54 @@ async function reviveAncestors(batchId: string): Promise<void> {
   }
 }
 
-/** Read the bin: one entry per delete action, newest first. */
+/** The shape every binnable row shares, plus a display label. */
+interface BinnedRow {
+  kind: BinKind
+  id: string
+  deletedAt: string
+  batchId: string | null
+  isRoot: boolean
+  label: string
+}
+
+function normalise<T extends { id: string; deleted_at: string | null; delete_batch_id: string | null; deleted_root: boolean }>(
+  kind: BinKind,
+  rows: T[],
+  label: (row: T) => string,
+): BinnedRow[] {
+  return rows
+    .filter((r) => r.deleted_at != null)
+    .map((r) => ({
+      kind,
+      id: r.id,
+      deletedAt: r.deleted_at!,
+      batchId: r.delete_batch_id,
+      isRoot: r.deleted_root,
+      label: label(r),
+    }))
+}
+
+const KIND_NOUN: Record<BinKind, [string, string]> = {
+  folder: ['folder', 'folders'],
+  experiment: ['experiment', 'experiments'],
+  date_log: ['log entry', 'log entries'],
+  note: ['note', 'notes'],
+}
+
+const plural = (n: number, kind: BinKind) =>
+  `${n} ${KIND_NOUN[kind][n === 1 ? 0 : 1]}`
+
+/**
+ * Read the bin: one entry per delete action, newest first.
+ *
+ * Entries are derived per *batch* rather than by trusting `deleted_root`. The
+ * row the user clicked delete on normally carries that flag, but it can be
+ * revived on its own — restoring a log revives its experiment, restoring an
+ * experiment revives its folder — and a partly-applied bin never sets it at
+ * all. Grouping by batch and naming it after the shallowest row still binned
+ * means such a set is represented by whatever survives, instead of dropping out
+ * of the bin and being purged 30 days later without ever having been listed.
+ */
 export async function listBin(): Promise<BinEntry[]> {
   const [folders, experiments, logs, notes] = await Promise.all([
     supabase.from('folders').select().not('deleted_at', 'is', null),
@@ -184,64 +266,84 @@ export async function listBin(): Promise<BinEntry[]> {
   const failed = [folders, experiments, logs, notes].find((r) => r.error)
   if (failed?.error) throw failed.error
 
-  const allExps = (experiments.data ?? []) as Experiment[]
-  const allLogs = (logs.data ?? []) as DateLog[]
+  return binEntries({
+    folders: (folders.data ?? []) as Folder[],
+    experiments: (experiments.data ?? []) as Experiment[],
+    date_logs: (logs.data ?? []) as DateLog[],
+    notes: (notes.data ?? []) as Note[],
+  })
+}
+
+/** The binned rows, by table. */
+export interface BinnedRows {
+  folders: Folder[]
+  experiments: Experiment[]
+  date_logs: DateLog[]
+  notes: Note[]
+}
+
+/** The pure half of `listBin` — see its doc comment for why it groups by batch. */
+export function binEntries(rows: BinnedRows): BinEntry[] {
+  // Parent-to-child order: the shallowest tier holding a row names its batch.
+  const tiers: BinnedRow[][] = [
+    normalise('folder', rows.folders, (f) => f.title),
+    normalise('experiment', rows.experiments, (e) => e.title),
+    normalise(
+      'date_log',
+      rows.date_logs,
+      (l) => l.status_details?.trim() || `Log from ${l.log_date}`,
+    ),
+    normalise('note', rows.notes, (n) => n.body.slice(0, 80) || 'Note'),
+  ]
+  const all = tiers.flat()
+
   const entries: BinEntry[] = []
+  const claimed = new Set<string>()
 
-  const add = (
-    kind: BinKind,
-    row: { id: string; deleted_at: string | null; delete_batch_id: string | null },
-    label: string,
-    contains: string | null,
-  ) => {
-    if (!row.deleted_at) return
-    entries.push({
-      kind,
-      id: row.id,
-      batchId: row.delete_batch_id,
-      label,
-      contains,
-      deletedAt: row.deleted_at,
-      daysLeft: daysLeft(row.deleted_at),
-    })
-  }
+  for (const tier of tiers) {
+    for (const row of tier) {
+      // Rows binned before batch ids existed can't be grouped or restored as a
+      // set; list them individually so they're at least visible.
+      if (!row.batchId) {
+        entries.push({
+          kind: row.kind,
+          id: row.id,
+          batchId: null,
+          label: row.label,
+          contains: null,
+          deletedAt: row.deletedAt,
+          daysLeft: daysLeft(row.deletedAt),
+        })
+        continue
+      }
+      if (claimed.has(row.batchId)) continue
+      claimed.add(row.batchId)
 
-  for (const f of (folders.data ?? []) as Folder[]) {
-    if (!f.deleted_root) continue
-    const expCount = allExps.filter(
-      (e) => e.delete_batch_id === f.delete_batch_id,
-    ).length
-    const logCount = allLogs.filter(
-      (l) => l.delete_batch_id === f.delete_batch_id,
-    ).length
-    const parts = [
-      expCount > 0 && `${expCount} experiment${expCount === 1 ? '' : 's'}`,
-      logCount > 0 && `${logCount} log entr${logCount === 1 ? 'y' : 'ies'}`,
-    ].filter(Boolean) as string[]
-    add('folder', f, f.title, parts.length > 0 ? parts.join(' · ') : null)
-  }
+      const batch = row.batchId
+      // Within a tier the flagged row is the one the user actually clicked;
+      // fall back to any row at this depth when the flagged one is gone.
+      const rep = tier.find((r) => r.batchId === batch && r.isRoot) ?? row
 
-  for (const e of allExps) {
-    if (!e.deleted_root) continue
-    const logCount = allLogs.filter(
-      (l) => l.delete_batch_id === e.delete_batch_id,
-    ).length
-    add(
-      'experiment',
-      e,
-      e.title,
-      logCount > 0 ? `${logCount} log entr${logCount === 1 ? 'y' : 'ies'}` : null,
-    )
-  }
+      // Everything else coming back with it, counted per kind.
+      const counts = new Map<BinKind, number>()
+      for (const other of all) {
+        if (other.batchId !== batch || other === rep) continue
+        counts.set(other.kind, (counts.get(other.kind) ?? 0) + 1)
+      }
+      const parts = [...counts.entries()]
+        .filter(([, n]) => n > 0)
+        .map(([kind, n]) => plural(n, kind))
 
-  for (const l of allLogs) {
-    if (!l.deleted_root) continue
-    add('date_log', l, l.status_details?.trim() || `Log from ${l.log_date}`, null)
-  }
-
-  for (const n of (notes.data ?? []) as Note[]) {
-    if (!n.deleted_root) continue
-    add('note', n, n.body.slice(0, 80) || 'Note', null)
+      entries.push({
+        kind: rep.kind,
+        id: rep.id,
+        batchId: batch,
+        label: rep.label,
+        contains: parts.length > 0 ? parts.join(' · ') : null,
+        deletedAt: rep.deletedAt,
+        daysLeft: daysLeft(rep.deletedAt),
+      })
+    }
   }
 
   return entries.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt))
@@ -250,7 +352,14 @@ export async function listBin(): Promise<BinEntry[]> {
 /** Hard-delete one batch now, photos included. */
 export async function purgeBatch(batchId: string): Promise<void> {
   await purgeWhere((table) =>
-    supabase.from(table).select().eq('delete_batch_id', batchId),
+    supabase
+      .from(table)
+      .select()
+      .eq('delete_batch_id', batchId)
+      // Never reachable through the bin UI, but a batch id can outlive a row
+      // that was revived as somebody's ancestor. Purging by id alone would then
+      // hard-delete a live folder and cascade to everything inside it.
+      .not('deleted_at', 'is', null),
   )
 }
 
@@ -269,7 +378,7 @@ export async function purgeExpired(): Promise<number> {
 }
 
 type Selector = (
-  table: 'folders' | 'experiments' | 'date_logs' | 'notes',
+  table: BinTable,
 ) => PromiseLike<{ data: unknown[] | null; error: unknown }>
 
 /**
@@ -284,6 +393,9 @@ async function purgeWhere(select: Selector): Promise<number> {
     select('date_logs'),
     select('notes'),
   ])
+
+  const failedSelect = [folders, experiments, logs, notes].find((r) => r.error)
+  if (failedSelect?.error) throw failedSelect.error
 
   const rows = {
     folders: (folders.data ?? []) as Folder[],
@@ -307,31 +419,25 @@ async function purgeWhere(select: Selector): Promise<number> {
     ...rows.notes.map((n) => n.image_url),
   ].filter((u): u is string => !!u)
 
-  const byId = (
-    table: 'folders' | 'experiments' | 'date_logs' | 'notes',
-    ids: string[],
-  ) => (ids.length === 0 ? null : supabase.from(table).delete().in('id', ids))
+  const byId = async (table: BinTable, ids: string[]) => {
+    if (ids.length === 0) return
+    const { error } = await supabase.from(table).delete().in('id', ids)
+    // Deleting the photos of rows that are still there would leave the user
+    // with permanently broken images, so a failed delete has to stop the purge
+    // rather than fall through to the storage cleanup.
+    if (error) throw error
+  }
 
   // Parents first: deleting a folder cascades to its experiments and logs.
-  await byId(
-    'folders',
-    rows.folders.map((f) => f.id),
-  )
-  await byId(
-    'experiments',
-    rows.experiments.map((e) => e.id),
-  )
-  await byId(
-    'date_logs',
-    rows.date_logs.map((l) => l.id),
-  )
-  await byId(
-    'notes',
-    rows.notes.map((n) => n.id),
-  )
+  await byId('folders', rows.folders.map((f) => f.id))
+  await byId('experiments', rows.experiments.map((e) => e.id))
+  await byId('date_logs', rows.date_logs.map((l) => l.id))
+  await byId('notes', rows.notes.map((n) => n.id))
 
-  // Best effort: an orphaned image costs storage but shouldn't fail the purge.
-  await removeStoredImages(urls)
+  // Best effort, and only files nothing points at any more: one upload can be
+  // shared across every experiment in a folder (see FolderDateLogForm), so a
+  // blind delete here would break the photo in the entries that survived.
+  await removeUnreferencedImages(urls)
 
   return total
 }

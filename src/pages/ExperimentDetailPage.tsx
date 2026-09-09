@@ -79,7 +79,12 @@ export default function ExperimentDetailPage() {
     handoff.current.folder ?? null,
   )
   const [loading, setLoading] = useState(!seededExperiment)
-  const [error, setError] = useState<string | null>(null)
+  // Two kinds of failure, deliberately separate: `loadError` means we have no
+  // experiment to show and the page is replaced by a retry prompt, while
+  // `actionError` (a failed export, a failed "mark done") is a dismissible
+  // banner over a page that is still perfectly usable.
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -107,7 +112,7 @@ export default function ExperimentDetailPage() {
     async (opts?: { background?: boolean }) => {
       if (!id) return
       if (!opts?.background) setLoading(true)
-      setError(null)
+      setLoadError(null)
 
       const controller = new AbortController()
       const abortTimer = setTimeout(() => controller.abort(), 12000)
@@ -124,7 +129,7 @@ export default function ExperimentDetailPage() {
       } catch (e) {
         // A background refresh that fails just leaves the seeded row on screen.
         if (!opts?.background) {
-          setError(
+          setLoadError(
             controller.signal.aborted
               ? 'The server took too long to respond. Check your connection and retry.'
               : e instanceof Error
@@ -178,26 +183,35 @@ export default function ExperimentDetailPage() {
   async function handleExport(format: 'pdf' | 'csv') {
     if (!experiment) return
     setExporting(format)
-    setError(null)
+    setActionError(null)
     try {
-      const { data, error } = await supabase
-        .from('date_logs')
-        .select()
-        .eq('experiment_id', experiment.id)
-        .is('deleted_at', null)
-        .order('log_date', { ascending: true })
-        .order('created_at', { ascending: true })
-      if (error) throw new Error(error.message)
+      // The timeline has already loaded these rows and keeps them current after
+      // every add and delete; re-fetching them was a second round trip for the
+      // same data. Both exporters sort their own input, so display order here
+      // doesn't matter. Fall back to a fetch only if the timeline hasn't
+      // reported yet (it renders below the export buttons).
+      let logs = timelineLogs
+      if (logs.length === 0) {
+        const { data, error } = await supabase
+          .from('date_logs')
+          .select()
+          .eq('experiment_id', experiment.id)
+          .is('deleted_at', null)
+          .order('log_date', { ascending: true })
+          .order('created_at', { ascending: true })
+        if (error) throw new Error(error.message)
+        logs = data ?? []
+      }
 
       if (format === 'csv') {
-        exportExperimentToCSV(experiment, data ?? [], folder)
+        exportExperimentToCSV(experiment, logs, folder)
       } else {
         // Lazy-loaded: keeps jspdf + html2canvas (~1 MB) out of the initial bundle.
         const { exportExperimentToPDF } = await import('../lib/utils/pdfExport')
-        await exportExperimentToPDF(experiment, data ?? [], folder)
+        await exportExperimentToPDF(experiment, logs, folder)
       }
     } catch (e) {
-      setError(
+      setActionError(
         e instanceof Error
           ? e.message
           : `${format.toUpperCase()} export failed.`,
@@ -216,7 +230,7 @@ export default function ExperimentDetailPage() {
       .select()
       .maybeSingle()
     if (error) {
-      setError(error.message)
+      setActionError(error.message)
       return
     }
     if (data) setExperiment(data)
@@ -231,7 +245,7 @@ export default function ExperimentDetailPage() {
     try {
       await binExperiment(id)
     } catch (e) {
-      setError(
+      setActionError(
         e instanceof Error ? e.message : 'Failed to delete the experiment.',
       )
       setDeleting(false)
@@ -251,12 +265,12 @@ export default function ExperimentDetailPage() {
     )
   }
 
-  if (error) {
+  if (loadError && !experiment) {
     return (
       <section className="mx-auto max-w-2xl">
         <BackLink to={backTo} label={backLabel} />
         <div className="mt-4 flex items-center justify-between gap-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
-          <span>{error}</span>
+          <span>{loadError}</span>
           <button
             type="button"
             onClick={() => void load()}
@@ -288,6 +302,23 @@ export default function ExperimentDetailPage() {
         <div className="mt-3 flex items-center gap-2 rounded-lg bg-secondary-container px-3 py-2 text-sm text-on-secondary-container">
           <CheckCircle2 className="size-4 shrink-0" />
           <span>{toast}</span>
+        </div>
+      )}
+
+      {(actionError ?? loadError) && (
+        <div className="mt-3 flex items-start justify-between gap-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
+          <span>{actionError ?? loadError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setActionError(null)
+              setLoadError(null)
+            }}
+            aria-label="Dismiss error"
+            className="shrink-0 font-medium underline"
+          >
+            Dismiss
+          </button>
         </div>
       )}
 

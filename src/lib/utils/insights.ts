@@ -1,25 +1,23 @@
 import type { DateLog, Experiment } from '../../types/database'
-import { dayMs } from './chart'
+import { dayMs, daysBetween } from './date'
 import {
   daysToStage,
   reachedRoot,
   reachedShoot,
   stageSnapshot,
+  type StageLog,
   type StageSnapshot,
 } from './stages'
 import { successRate, survivorCount, totalDeaths } from './survival'
 
-const DAY = 86_400_000
+export { daysBetween }
 
-/** Whole days between two ISO `yyyy-mm-dd` dates, or null if either is missing. */
-export function daysBetween(from: string | null, to: string | null) {
-  if (!from || !to) return null
-  return Math.round((dayMs(to) - dayMs(from)) / DAY)
-}
+/** What summarising a log needs: the stage columns plus its owning experiment. */
+export type SummaryLog = StageLog & Pick<DateLog, 'experiment_id'>
 
 export interface ExperimentSummary {
   experiment: Experiment
-  logs: DateLog[]
+  logs: SummaryLog[]
   initial: number | null
   deaths: number
   alive: number
@@ -36,7 +34,7 @@ export interface ExperimentSummary {
 
 export function summarise(
   experiment: Experiment,
-  logs: DateLog[],
+  logs: SummaryLog[],
 ): ExperimentSummary {
   const deaths = totalDeaths(logs)
   const initial = experiment.plant_count ?? null
@@ -59,9 +57,9 @@ export function summarise(
 /** Group logs by experiment and summarise each, ordered as `experiments` is. */
 export function summariseAll(
   experiments: Experiment[],
-  logs: DateLog[],
+  logs: SummaryLog[],
 ): ExperimentSummary[] {
-  const byExp = new Map<string, DateLog[]>()
+  const byExp = new Map<string, SummaryLog[]>()
   for (const log of logs) {
     const list = byExp.get(log.experiment_id)
     if (list) list.push(log)
@@ -100,7 +98,7 @@ export function fastestToRoot(summaries: ExperimentSummary[]) {
  */
 export function survivalSeries(
   experiment: Experiment,
-  logs: DateLog[],
+  logs: Pick<DateLog, 'log_date' | 'deaths_count'>[],
 ): { t: number; value: number }[] {
   const initial = experiment.plant_count ?? 0
   if (initial <= 0) return []
@@ -121,5 +119,7 @@ export function survivalSeries(
     if (existing >= 0) points[existing] = { t, value }
     else points.push({ t, value })
   }
-  return points
+  // The start point is pushed first but carries `started_on`, which a back-dated
+  // log entry can sit before; sorting keeps the chart's path from doubling back.
+  return points.sort((a, b) => a.t - b.t)
 }

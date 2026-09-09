@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { buildBackup, downloadJson } from '../lib/utils/backup'
 import { RETENTION_DAYS } from '../lib/utils/bin'
+import { today } from '../lib/utils/date'
 
 export default function SettingsPage() {
   const [busy, setBusy] = useState(false)
@@ -15,7 +16,7 @@ export default function SettingsPage() {
     setDoneAt(null)
     try {
       const backup = await buildBackup()
-      const stamp = new Date().toISOString().slice(0, 10)
+      const stamp = today()
       downloadJson(backup, `plant-experiments-backup-${stamp}.json`)
       const d = backup.data
       setDoneAt(

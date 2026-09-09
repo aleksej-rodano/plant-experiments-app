@@ -1,12 +1,17 @@
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import CareScheduleFields from '../components/CareScheduleFields'
 import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
 import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
-import { uploadImage, validateImage } from '../lib/utils/image'
+import {
+  removeUnreferencedImages,
+  uploadImage,
+  validateImage,
+} from '../lib/utils/image'
+import { today } from '../lib/utils/date'
 import type {
   Database,
   Experiment,
@@ -15,8 +20,6 @@ import type {
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 const STATUS_OPTIONS: { value: ExperimentStatus; label: string }[] = [
   { value: 'ongoing', label: 'Ongoing' },
@@ -51,6 +54,10 @@ export default function EditExperimentPage() {
   )
   const [image, setImage] = useState<File | null>(null)
   const [currentUrl, setCurrentUrl] = useState(seeded?.cover_image_url ?? '')
+  // The URL that is actually stored on the row right now. `currentUrl` tracks
+  // what the form will save (cleared to '' by the remove button), so it can't
+  // tell us which file to tidy up afterwards.
+  const storedUrl = useRef<string | null>(seeded?.cover_image_url ?? null)
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -84,6 +91,7 @@ export default function EditExperimentPage() {
           data.care_interval_days != null ? String(data.care_interval_days) : '',
         )
         setCurrentUrl(data.cover_image_url ?? '')
+        storedUrl.current = data.cover_image_url ?? null
       }
       setLoading(false)
     })()
@@ -142,6 +150,7 @@ export default function EditExperimentPage() {
 
     setBusy(true)
     try {
+      const previousUrl = storedUrl.current
       let coverUrl: string | null = currentUrl || null
       if (image) coverUrl = await uploadImage(image, user.id)
 
@@ -160,6 +169,12 @@ export default function EditExperimentPage() {
         .update(payload)
         .eq('id', id)
       if (error) throw error
+      storedUrl.current = coverUrl
+      // The replaced (or removed) photo is now unreferenced. Nothing else ever
+      // deleted these, so every edit used to leave a file behind in the bucket.
+      if (previousUrl && previousUrl !== coverUrl) {
+        void removeUnreferencedImages([previousUrl])
+      }
       void syncCareNotifications()
       navigate(backTo, {
         replace: true,

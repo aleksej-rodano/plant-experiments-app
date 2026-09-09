@@ -95,6 +95,13 @@ build so it launches fast and picks up each new deploy silently; nothing from
 Supabase is cached, so data is always live. There is no offline mode — the app
 needs a connection to load its data.
 
+The PDF export stack (jsPDF + html2canvas, ~780 kB) is deliberately left out of
+the precache — `globIgnores` in `vite.config.ts`. It is already a dynamic import
+so it stays off the initial page load, and precaching it would have undone that
+by pulling the whole thing down on first visit and again after every deploy,
+whether or not you ever export anything. It fetches on demand instead, which is
+also why Export PDF needs a connection.
+
 The Android app is a thin **Capacitor** shell that now loads the live site
 directly (`server.url` in `capacitor.config.ts`) instead of a copy baked into
 the APK. So a `git push` — which redeploys Vercel — updates the phone on its
@@ -182,6 +189,14 @@ transaction-wrapped, and you run them yourself in the Supabase SQL editor — th
 app expects the columns they add, so a new one has to be run before the features
 in that release will work.
 
+`db/2026-09-09_pest_guide_images_per_user.sql` is the current one to run. Pest
+reference photos move to their own owner-scoped table: `pest_guides` is seeded
+shared reference content, and the policy that let you set a photo on it was a
+table-wide UPDATE, so any signed-in account could also rewrite the pest names and
+treatment steps everyone else reads. That table is now read-only from the client
+and each account keeps its own photos. Photos added before the migration stay
+visible as a fallback.
+
 ## Future steps
 
 - **Native camera** — the log form now gives a Take photo / Choose from device
@@ -201,6 +216,12 @@ in that release will work.
 npm install
 npm run dev
 ```
+
+`npm test` runs the unit tests (vitest) over the date, care-schedule, stage and
+survival helpers — the parts with enough arithmetic to break quietly. They pin
+`TZ=Pacific/Auckland` on purpose: several of these helpers are about reading the
+*local* calendar rather than the UTC one, and in UTC the two agree, so a
+regression would pass unnoticed. `npm run lint` runs oxlint.
 
 Configuration (Supabase URL and key) lives in a git-ignored `.env.local` file.
 Build the production web bundle with `npm run build`. For the Android app,

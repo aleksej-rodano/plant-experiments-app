@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import type { DateLog, Experiment, Folder } from '../../types/database'
+import { today } from './date'
 import { stageEntry } from './stages'
 import { formatRate, successRate, survivorCount, totalDeaths } from './survival'
 
@@ -37,10 +38,19 @@ function slugify(value: string) {
   )
 }
 
+/**
+ * Escape for interpolation into the template — including into attribute values.
+ *
+ * `textContent` -> `innerHTML` runs the HTML text-node serialisation, which
+ * escapes only & < > and U+00A0; quotes come through untouched. That is fine in
+ * element content but not in `src="..."`, where a quote closes the attribute and
+ * anything after it (an `onerror`, say) becomes live markup in a node we append
+ * to document.body. Quotes are escaped explicitly for that reason.
+ */
 function esc(value: string) {
   const el = document.createElement('div')
   el.textContent = value
-  return el.innerHTML
+  return el.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
 /** Resolve once every <img> inside the node has loaded (or failed). */
@@ -80,7 +90,12 @@ function buildTemplate(
 ) {
   // Batch facts live on the folder now; fall back to any legacy values still on
   // the experiment row.
-  const plantCount = folder?.plant_count ?? experiment.plant_count
+  //
+  // plant_count is the exception: it is per-experiment everywhere in the app
+  // (folders.plant_count is only ever set by the folders backfill migration and
+  // is never written by the create/edit forms). Preferring the folder value here
+  // made the report contradict itself — "Plants: 12" beside "Surviving: 4/5".
+  const plantCount = experiment.plant_count ?? folder?.plant_count
   const origin = folder?.origin ?? experiment.origin
   const initialPrice = folder?.initial_price ?? experiment.initial_price
   const coverUrl = folder?.cover_image_url ?? experiment.cover_image_url
@@ -126,7 +141,7 @@ function buildTemplate(
   }
 
   const deaths = totalDeaths(dateLogs)
-  const initialForRate = experiment.plant_count ?? plantCount ?? null
+  const initialForRate = plantCount ?? null
 
   const facts: string[] = []
   if (folder) facts.push(`<strong>Folder:</strong> ${esc(folder.title)}`)
@@ -325,7 +340,7 @@ export async function exportExperimentToPDF(
       pageHasContent = true
     }
 
-    const stamp = new Date().toISOString().slice(0, 10)
+    const stamp = today()
     doc.save(`${slugify(experiment.title)}-${stamp}.pdf`)
   } finally {
     container.remove()

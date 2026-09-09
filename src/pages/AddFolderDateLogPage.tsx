@@ -50,6 +50,8 @@ export default function AddFolderDateLogPage() {
     return () => {
       cancelled = true
     }
+    // `folder` / `experiments` intentionally excluded — the effect exists to
+    // fetch whatever route state didn't hand us, once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folderId])
 

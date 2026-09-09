@@ -31,3 +31,6 @@ dev-dist
 *.njsproj
 *.sln
 *.sw?
+
+# Vitest
+coverage
