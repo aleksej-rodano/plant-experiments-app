@@ -18,15 +18,27 @@ The app is organised in three levels:
 2. **Experiments** — inside a folder, each experiment is one thing you changed
    (e.g. "rooting powder", "smaller cuttings", "control"). You give it a name, the
    number of plants involved, notes, and an initial photo.
-3. **Log entries** — inside an experiment, you add dated updates: how the plants
-   look that day, with an optional photo. These stack up into a timeline so you
-   can see progress at a glance. Tap any photo in the timeline (or on a note) to
-   open it full-screen, then pinch or double-tap to zoom in and drag to pan.
+3. **Log entries** — inside an experiment, you add dated check-ins: how many
+   plants sit in each root/shoot stage that day, with an optional photo and
+   note. These stack up into a timeline, topped by a **latest-check-in
+   snapshot** (counts + percentages for both tracks, % rooted / shoot /
+   established, and the leafing-without-rooting flag) and **trend charts**
+   showing the stage distribution across every check-in. Tap any photo in the
+   timeline (or on a note) to open it full-screen, then pinch or double-tap to
+   zoom in and drag to pan.
 
 Three ways to add a log entry, depending on how much you want to type:
 
-- **Add Log Entry** — the full form: notes, root length, new leaves, plants lost
-  and the cause, photo.
+- **Add Log Entry** — the full check-in. Instead of measuring one plant, you
+  tally how many plants sit in each stage right now, on two independent scales:
+  - **Root track** — R0 no root · R1 initiation (<2 mm) · R2 elongation (≥2 mm)
+  - **Shoot / leaf track** — S0 none · S1 bud/leaf closed · S2 leaf unfolded ·
+    S3 established
+  Plus a **dead / removed** count with cause, and a **leafing without rooting**
+  count — plants pushing a leaf with no root yet, an early risk signal that has
+  to be entered on its own. Counts are the current state, so they can go down if
+  something dies back. If the buckets don't add up to the plants you started
+  with, you get a soft warning but can still save.
 - **Photo** — the quick path. Take a picture, save. The note is optional.
 - **Log all** (from a folder) — one entry written to every experiment in the
   folder at once, for when you change the water or fertilize the whole batch. It
@@ -48,8 +60,9 @@ button, and folders needing attention are badged in the folder list.
 Comparing experiments is the point of the app, so a folder with more than one
 experiment also shows:
 
-- **Charts** overlaying every experiment on shared axes — survival, root length,
-  and new leaves — so you can see which treatment is pulling ahead.
+- **A survival chart** overlaying every experiment on shared axes, plus a
+  **latest-snapshot table** — % rooted, % with any shoot, % established and the
+  leafing-without-rooting count for each experiment side by side.
 - **A verdict line** naming the best treatment so far and the fastest to root.
 
 Other tabs:

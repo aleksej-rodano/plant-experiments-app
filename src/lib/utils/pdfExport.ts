@@ -1,6 +1,7 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import type { DateLog, Experiment, Folder } from '../../types/database'
+import { stageEntry } from './stages'
 import { formatRate, successRate, survivorCount, totalDeaths } from './survival'
 
 /** A4 at ~96dpi, in CSS px — the render width of the hidden template. */
@@ -180,10 +181,13 @@ function buildTemplate(
   } else {
     dateLogs.forEach((log, i) => {
       const metrics: string[] = []
-      if (log.root_length_mm != null)
-        metrics.push(`Roots ${esc(String(log.root_length_mm))} mm`)
-      if (log.new_leaves != null)
-        metrics.push(`+${esc(String(log.new_leaves))} leaves`)
+      const stage = stageEntry(log)
+      if (stage) {
+        metrics.push(`Roots R0/R1/R2 ${stage.root.join(' / ')}`)
+        metrics.push(`Shoots S0/S1/S2/S3 ${stage.shoot.join(' / ')}`)
+        if (stage.leafingWithoutRooting > 0)
+          metrics.push(`${stage.leafingWithoutRooting} leafing without rooting`)
+      }
       if (log.deaths_count > 0)
         metrics.push(
           `${esc(String(log.deaths_count))} died${
