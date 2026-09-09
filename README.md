@@ -91,9 +91,19 @@ from `main` via Vercel) and also runs locally with `npm run dev`.
 It's an **installable PWA** — open the site on a phone or desktop and use the
 browser's "Install app" / "Add to Home Screen", and it runs in its own window
 with the plant-green icon. The service worker precaches the (content-hashed)
-build so it launches fast and picks up each new deploy silently; nothing from
-Supabase is cached, so data is always live. There is no offline mode — the app
-needs a connection to load its data.
+build so it launches fast and picks up each new deploy silently.
+
+**It also works offline for viewing**, once you've opened a screen at least
+once while online: the service worker caches Supabase's API responses (tries
+the network first, falls back to the cached copy) and photos (served from
+cache immediately, refreshed in the background), so folders, experiments,
+logs, and photos you've already seen stay visible with no connection. A small
+"Offline" banner appears whenever the browser loses its connection. There is
+still no write queue — creating, editing, or deleting anything needs a live
+connection and will show its normal error message until one is back. (Cached
+data is keyed only by URL, not by account, so signing out clears it to keep a
+second account on the same device from seeing the first account's cached
+rows.)
 
 The Android app is a thin **Capacitor** shell that now loads the live site
 directly (`server.url` in `capacitor.config.ts`) instead of a copy baked into
@@ -192,8 +202,10 @@ in that release will work.
 - **Release build** — the debug APK is built and installable now. A signed
   release build (own keystore, smaller optimised bundle) is only needed if the
   app is distributed more widely; steps are in `ANDROID_BUILD.md`.
-- Smaller polish: offline tolerance, and tidying a few rough edges in the pest
-  and tips sections.
+- Smaller polish: tidying a few rough edges in the pest and tips sections.
+- **Offline writes** — reads work offline from cache now, but adding or
+  editing anything still needs a live connection. A write queue (with local
+  ids and background sync) would close that gap.
 
 ## Running it locally
 

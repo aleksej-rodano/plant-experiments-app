@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { AuthContext, type AuthContextValue } from './auth-context'
 import { isNativeApp } from './native'
+import { clearOfflineDataCaches } from './offlineCache'
 import { supabase } from './supabase'
 
 // The hosted web app handles the reset link even when the request came from the
@@ -93,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut: async () => {
         const { error } = await supabase.auth.signOut()
         if (error) throw error
+        await clearOfflineDataCaches()
       },
       sendPasswordReset: async (email) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {

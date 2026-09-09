@@ -7,10 +7,12 @@ import {
   NotebookPen,
   Settings,
   Sprout,
+  WifiOff,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../lib/hooks/useAuth'
+import { useOnlineStatus } from '../lib/hooks/useOnlineStatus'
 import { useKeyboardOpen } from '../lib/native/useKeyboardOpen'
 import { purgeExpired } from '../lib/utils/bin'
 
@@ -41,6 +43,7 @@ function navItemClass(isActive: boolean) {
 export default function Layout() {
   const { user, signOut } = useAuth()
   const keyboardOpen = useKeyboardOpen()
+  const online = useOnlineStatus()
 
   // Clear out anything past its 30-day restore window, photos included. Silent
   // by design: it's housekeeping, and a failure just means it retries next load.
@@ -88,6 +91,13 @@ export default function Layout() {
           </button>
         </div>
       </header>
+
+      {!online && (
+        <div className="flex shrink-0 items-center justify-center gap-2 bg-surface-variant px-3 py-1.5 text-xs font-medium text-on-surface-variant">
+          <WifiOff className="size-3.5" />
+          Offline — showing saved data. Changes need a connection to save.
+        </div>
+      )}
 
       <div className="mx-auto flex w-full max-w-5xl flex-1 overflow-hidden">
         {/* Desktop navigation rail */}
