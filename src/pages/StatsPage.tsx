@@ -23,6 +23,8 @@ function median(values: number[]): number | null {
 }
 
 interface Group {
+  /** Stable identity for React — the grouping key, which `key` may duplicate. */
+  id: string
   /** Display text — the first spelling seen, not the normalised grouping key. */
   key: string
   plants: number
@@ -51,6 +53,7 @@ function groupBy(
     if (!raw || !id || s.initial == null || s.initial <= 0) continue
     const key = displayLabel ? id : raw.toLowerCase()
     const g = map.get(key) ?? {
+      id: key,
       key: raw,
       plants: 0,
       alive: 0,
@@ -336,7 +339,7 @@ export default function StatsPage() {
           <Panel title="Survival by treatment" icon={Trophy}>
             <ul className="flex flex-col gap-3">
               {byTreatment.slice(0, 8).map((g) => (
-                <RateBar key={g.key} group={g} />
+                <RateBar key={g.id} group={g} />
               ))}
             </ul>
           </Panel>
@@ -346,7 +349,7 @@ export default function StatsPage() {
           <Panel title="Survival by folder" icon={BarChart3}>
             <ul className="flex flex-col gap-3">
               {byFolder.slice(0, 8).map((g) => (
-                <RateBar key={g.key} group={g} />
+                <RateBar key={g.id} group={g} />
               ))}
             </ul>
           </Panel>
@@ -356,7 +359,7 @@ export default function StatsPage() {
           <Panel title="Survival by origin" icon={Sprout}>
             <ul className="flex flex-col gap-3">
               {byOrigin.slice(0, 8).map((g) => (
-                <RateBar key={g.key} group={g} />
+                <RateBar key={g.id} group={g} />
               ))}
             </ul>
           </Panel>

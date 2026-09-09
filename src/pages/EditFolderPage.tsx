@@ -271,7 +271,8 @@ export default function EditFolderPage() {
           onTask={setCareTask}
           interval={careInterval}
           onInterval={setCareInterval}
-          error={errors.careInterval ?? errors.careTask}
+          error={errors.careInterval}
+          taskError={errors.careTask}
         />
 
         <CoverImagePicker

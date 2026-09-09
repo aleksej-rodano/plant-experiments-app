@@ -19,12 +19,14 @@ export default function AddDateLogPage() {
   )
   const [priorDeaths, setPriorDeaths] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const backTo = id ? `/experiments/${id}` : '/experiments'
 
   useEffect(() => {
     if (!id) return
     let cancelled = false
+    setError(null)
     void (async () => {
       const [expRes, logRes] = await Promise.all([
         experiment
@@ -58,7 +60,7 @@ export default function AddDateLogPage() {
     }
     // `experiment` intentionally excluded — we only fetch what's missing once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, reloadKey])
 
   return (
     <section className="mx-auto max-w-lg">
@@ -74,9 +76,16 @@ export default function AddDateLogPage() {
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
-          {error}
-        </p>
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setReloadKey((n) => n + 1)}
+            className="shrink-0 font-medium underline"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       {!id ? (

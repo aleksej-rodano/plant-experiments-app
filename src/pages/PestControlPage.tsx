@@ -14,12 +14,12 @@ import type { PestGuide } from '../types/database'
 
 function PestPhoto({
   guide,
-  imageUrl,
+  ownUrl,
   onImage,
 }: {
   guide: PestGuide
-  /** This user's own photo, falling back to the seeded shared one. */
-  imageUrl: string | null
+  /** This user's own photo for this pest, if they've added one. */
+  ownUrl: string | null
   onImage: (id: string, url: string) => void
 }) {
   const { user } = useAuth()
@@ -53,10 +53,11 @@ function PestPhoto({
           { onConflict: 'user_id,pest_guide_id' },
         )
       if (error) throw error
-      const replaced = imageUrl
+      const replaced = ownUrl
       onImage(guide.id, url)
-      // Drop the file we just replaced, unless something still points at it —
-      // the seeded shared URL, for one, belongs to everybody.
+      // Only ever our own previous upload. `guide.image_url` is the seeded
+      // shared photo and belongs to everybody, so it must never be offered up
+      // for deletion here even though it is what was on screen.
       if (replaced && replaced !== url) {
         void removeUnreferencedImages([replaced])
       }
@@ -68,6 +69,9 @@ function PestPhoto({
     }
   }
 
+  // Own photo wins; the seeded shared one is the fallback.
+  const displayUrl = ownUrl ?? guide.image_url
+
   return (
     <div className="mb-5">
       <input
@@ -77,10 +81,10 @@ function PestPhoto({
         className="hidden"
         onChange={(e) => void pick(e.target.files?.[0])}
       />
-      {imageUrl ? (
+      {displayUrl ? (
         <figure>
           <img
-            src={imageUrl}
+            src={displayUrl}
             alt={`${guide.pest_name} reference photo`}
             className="w-2/3 max-w-xs rounded-lg object-cover ring-1 ring-outline-variant"
             loading="lazy"
@@ -233,7 +237,7 @@ export default function PestControlPage() {
                   >
                     <PestPhoto
                       guide={guide}
-                      imageUrl={ownImages[guide.id] ?? guide.image_url}
+                      ownUrl={ownImages[guide.id] ?? null}
                       onImage={setImage}
                     />
 

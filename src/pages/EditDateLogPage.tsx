@@ -21,12 +21,14 @@ export default function EditDateLogPage() {
   )
   const [priorDeaths, setPriorDeaths] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const backTo = id ? `/experiments/${id}` : '/experiments'
 
   useEffect(() => {
     if (!id || !logId) return
     let cancelled = false
+    setError(null)
     void (async () => {
       const [logRow, expRow, allLogs] = await Promise.all([
         navState?.log
@@ -60,12 +62,14 @@ export default function EditDateLogPage() {
       if (expRow.error) setError(expRow.error.message)
       else if (expRow.data) setPlantCount(expRow.data.plant_count ?? null)
       if (allLogs.error) {
+        // Not 0: that would raise this entry's death cap to the full plant
+        // count and let the user re-record losses other entries already hold.
+        // Leaving priorDeaths null keeps the form behind its spinner.
         setError(allLogs.error.message)
-        setPriorDeaths(0)
-      } else {
-        const others = (allLogs.data ?? []).filter((l) => l.id !== logId)
-        setPriorDeaths(totalDeaths(others))
+        return
       }
+      const others = (allLogs.data ?? []).filter((l) => l.id !== logId)
+      setPriorDeaths(totalDeaths(others))
     })()
     return () => {
       cancelled = true
@@ -73,7 +77,7 @@ export default function EditDateLogPage() {
     // `navState` intentionally excluded — route state seeds the first render and
     // then never changes for this mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, logId])
+  }, [id, logId, reloadKey])
 
   return (
     <section className="mx-auto max-w-lg">
@@ -89,17 +93,26 @@ export default function EditDateLogPage() {
       </div>
 
       {error && (
-        <p className="mb-4 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
-          {error}
-        </p>
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg bg-error-container px-3 py-2 text-sm text-on-error-container">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setReloadKey((n) => n + 1)}
+            className="shrink-0 font-medium underline"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
       {!id || !logId ? (
         <p className="text-sm text-error">Missing experiment or log id.</p>
       ) : !log || priorDeaths == null ? (
-        <div className="flex justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-primary" />
-        </div>
+        error ? null : (
+          <div className="flex justify-center py-10">
+            <Loader2 className="size-5 animate-spin text-primary" />
+          </div>
+        )
       ) : (
         <DateLogForm
           experimentId={id}

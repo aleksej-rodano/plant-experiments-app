@@ -189,7 +189,24 @@ transaction-wrapped, and you run them yourself in the Supabase SQL editor — th
 app expects the columns they add, so a new one has to be run before the features
 in that release will work.
 
-`db/2026-09-09_pest_guide_images_per_user.sql` is the current one to run. Pest
+Three are currently outstanding — run them in date order.
+
+`db/2026-09-10_storage_policies.sql` fixes the `experiment-photos` bucket. It
+had an INSERT policy that only checked you were signed in (not which bucket or
+path), a public SELECT policy, and **no DELETE policy at all** — so
+`supabase.storage.remove()` was silently denied and the app has never actually
+deleted a photo. The bin's 30-day purge left every image behind, and replacing a
+photo leaked the old one. The migration scopes writes to your own `<uid>/`
+prefix, adds the missing delete policy, and sets a 10 MB / JPEG-PNG limit on the
+bucket so the server enforces what `validateImage` checks in the client.
+
+`db/2026-09-10_not_null_invariants.sql` adds `not null` to columns the app
+already treats as non-null (`date_logs.experiment_id`, the `created_at` /
+`updated_at` timestamps, `experiments.user_id`). They all have defaults and no
+row violates them today; this just stops the schema and
+`src/types/database.ts` disagreeing.
+
+`db/2026-09-09_pest_guide_images_per_user.sql` — already run. Pest
 reference photos move to their own owner-scoped table: `pest_guides` is seeded
 shared reference content, and the policy that let you set a photo on it was a
 table-wide UPDATE, so any signed-in account could also rewrite the pest names and

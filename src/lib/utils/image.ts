@@ -99,24 +99,38 @@ export function storagePathFromUrl(url: string): string | null {
  * Prefer `removeUnreferencedImages` unless you already know nothing else points
  * at these files -- see the note there.
  */
-export async function removeStoredImages(urls: string[]): Promise<void> {
+export async function removeStoredImages(urls: string[]): Promise<number> {
   const paths = [...new Set(urls)]
     .map(storagePathFromUrl)
     .filter((p): p is string => p !== null)
-  if (paths.length === 0) return
+  if (paths.length === 0) return 0
   try {
-    await supabase.storage.from(BUCKET).remove(paths)
+    // `remove` reports a refusal in `error`, it does not throw. Discarding the
+    // result made an RLS denial indistinguishable from success, which is how
+    // the bucket went years without a delete policy while the app looked like
+    // it was cleaning up after itself. Return the count so callers that care
+    // can tell; the callers here still treat failure as tolerable.
+    const { data, error } = await supabase.storage.from(BUCKET).remove(paths)
+    if (error) return 0
+    return data?.length ?? 0
   } catch {
-    // ignored on purpose
+    return 0
   }
 }
 
-/** Every column that can hold a public URL from our bucket. */
+/**
+ * Every column that can hold a public URL from our bucket. Missing one here
+ * means `removeUnreferencedImages` would happily delete a file that column
+ * still points at — pest_guides especially, whose photos are shared reference
+ * content that every account sees.
+ */
 const IMAGE_COLUMNS = [
   ['folders', 'cover_image_url'],
   ['experiments', 'cover_image_url'],
   ['date_logs', 'image_url'],
   ['notes', 'image_url'],
+  ['pest_guides', 'image_url'],
+  ['pest_guide_images', 'image_url'],
 ] as const
 
 /**
@@ -154,11 +168,11 @@ async function unreferencedUrls(urls: string[]): Promise<string[]> {
  * directions: an image left behind only costs storage, whereas deleting one out
  * from under a surviving row shows the user a permanently broken photo.
  */
-export async function removeUnreferencedImages(urls: string[]): Promise<void> {
-  if (urls.length === 0) return
+export async function removeUnreferencedImages(urls: string[]): Promise<number> {
+  if (urls.length === 0) return 0
   try {
-    await removeStoredImages(await unreferencedUrls(urls))
+    return await removeStoredImages(await unreferencedUrls(urls))
   } catch {
-    // ignored on purpose
+    return 0
   }
 }

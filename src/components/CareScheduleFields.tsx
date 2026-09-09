@@ -8,7 +8,10 @@ interface Props {
   onTask: (value: string) => void
   interval: string
   onInterval: (value: string) => void
+  /** Validation message for the interval field. */
   error?: string
+  /** Validation message for the task field. */
+  taskError?: string
 }
 
 /**
@@ -22,6 +25,7 @@ export default function CareScheduleFields({
   interval,
   onInterval,
   error,
+  taskError,
 }: Props) {
   return (
     <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
@@ -39,6 +43,7 @@ export default function CareScheduleFields({
             placeholder="e.g. Fertilize"
             className={inputClass}
           />
+          {taskError && <span className="text-xs text-error">{taskError}</span>}
         </label>
         <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
           Every … days
