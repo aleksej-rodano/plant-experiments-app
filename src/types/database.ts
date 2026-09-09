@@ -107,8 +107,18 @@ export interface Database {
           log_date: string
           status_details: string
           image_url: string | null
-          root_length_mm: number | null
-          new_leaves: number | null
+          // Per check-in stage tally: how many plants currently sit in each
+          // root/shoot bucket. Null on entries that didn't record stages
+          // (photo-only, quick watered/fertilized, pre-2026-09-09 rows).
+          r0_count: number | null
+          r1_count: number | null
+          r2_count: number | null
+          s0_count: number | null
+          s1_count: number | null
+          s2_count: number | null
+          s3_count: number | null
+          /** Plants that are S1+ but still R0 — an early reserve-spend risk. */
+          leafing_without_rooting: number | null
           deaths_count: number
           death_cause: string | null
           watered: boolean
@@ -125,8 +135,14 @@ export interface Database {
           log_date: string
           status_details: string
           image_url?: string | null
-          root_length_mm?: number | null
-          new_leaves?: number | null
+          r0_count?: number | null
+          r1_count?: number | null
+          r2_count?: number | null
+          s0_count?: number | null
+          s1_count?: number | null
+          s2_count?: number | null
+          s3_count?: number | null
+          leafing_without_rooting?: number | null
           deaths_count?: number
           death_cause?: string | null
           watered?: boolean
