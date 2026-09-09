@@ -1,11 +1,17 @@
-import { Camera, Circle, ImagePlus, Loader2, X } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Camera, Circle, ImagePlus, Loader2, TriangleAlert, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PhotoAnnotator from './PhotoAnnotator'
 import QuickCareButtons from './QuickCareButtons'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { uploadImage, validateImage } from '../lib/utils/image'
+import {
+  ROOT_STAGES,
+  SHOOT_STAGES,
+  stageEntry,
+  stageWarnings,
+} from '../lib/utils/stages'
 import { DEATH_CAUSE_SUGGESTIONS } from '../lib/utils/survival'
 import type { DateLog } from '../types/database'
 
@@ -19,7 +25,7 @@ interface Props {
   mode: 'add' | 'edit'
   /** The row being edited (edit mode only). */
   initial?: DateLog
-  /** Experiment's initial plant count, for the "plants still alive" cap. */
+  /** Experiment's initial plant count — the reconciliation target + death cap. */
   plantCount: number | null
   /** Deaths logged in *other* entries — used to cap this entry's death count. */
   priorDeaths: number
@@ -34,6 +40,11 @@ interface Props {
 function numOrEmpty(v: number | null | undefined) {
   return v == null ? '' : String(v)
 }
+
+const STAGE_KEYS = [
+  ...ROOT_STAGES.map((s) => s.key),
+  ...SHOOT_STAGES.map((s) => s.key),
+] as const
 
 export default function DateLogForm({
   experimentId,
@@ -52,10 +63,16 @@ export default function DateLogForm({
   const [statusDetails, setStatusDetails] = useState(
     initial?.status_details ?? '',
   )
-  const [rootLength, setRootLength] = useState(
-    numOrEmpty(initial?.root_length_mm),
+
+  // One text-state entry per stage bucket, keyed by column name.
+  const [stages, setStages] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      STAGE_KEYS.map((k) => [k, numOrEmpty(initial?.[k])]),
+    ),
   )
-  const [newLeaves, setNewLeaves] = useState(numOrEmpty(initial?.new_leaves))
+  const [leafingNoRoot, setLeafingNoRoot] = useState(
+    numOrEmpty(initial?.leafing_without_rooting),
+  )
   const [deaths, setDeaths] = useState(
     initial?.deaths_count ? String(initial.deaths_count) : '',
   )
@@ -80,6 +97,23 @@ export default function DateLogForm({
   const aliveBefore =
     plantCount == null ? null : Math.max(0, plantCount - priorDeaths)
 
+  const stagesTouched =
+    STAGE_KEYS.some((k) => stages[k].trim() !== '') || leafingNoRoot.trim() !== ''
+
+  // Live soft warnings — a synthetic DateLog carrying just what's typed so far.
+  const warnings = useMemo(() => {
+    if (!stagesTouched) return []
+    const draft = {
+      ...Object.fromEntries(
+        STAGE_KEYS.map((k) => [k, stages[k].trim() ? Number(stages[k]) : 0]),
+      ),
+      deaths_count: deaths.trim() ? Number(deaths) : 0,
+      leafing_without_rooting: leafingNoRoot.trim() ? Number(leafingNoRoot) : 0,
+    } as unknown as DateLog
+    const entry = stageEntry(draft)
+    return entry ? stageWarnings(entry, plantCount) : []
+  }, [stagesTouched, stages, deaths, leafingNoRoot, plantCount])
+
   useEffect(() => {
     if (!image) {
       setNewPreviewUrl(null)
@@ -89,6 +123,10 @@ export default function DateLogForm({
     setNewPreviewUrl(url)
     return () => URL.revokeObjectURL(url)
   }, [image])
+
+  function setStage(key: string, value: string) {
+    setStages((s) => ({ ...s, [key]: value }))
+  }
 
   function pickImage(file: File | undefined) {
     if (!file) return
@@ -108,31 +146,34 @@ export default function DateLogForm({
     if (galleryRef.current) galleryRef.current.value = ''
   }
 
+  function wholeNonNeg(v: string) {
+    const n = Number(v)
+    return Number.isInteger(n) && n >= 0
+  }
+
   function validate() {
     const next: Record<string, string> = {}
-    if (!statusDetails.trim()) next.statusDetails = 'Status details are required.'
     if (!logDate) next.logDate = 'Pick a date.'
     else if (logDate > today()) next.logDate = 'Date cannot be in the future.'
 
-    if (rootLength.trim()) {
-      const n = Number(rootLength)
-      if (Number.isNaN(n) || n < 0) next.rootLength = 'Enter a number ≥ 0.'
+    for (const k of STAGE_KEYS) {
+      if (stages[k].trim() && !wholeNonNeg(stages[k])) {
+        next[k] = 'Whole number ≥ 0.'
+      }
     }
-    if (newLeaves.trim()) {
-      const n = Number(newLeaves)
-      if (!Number.isInteger(n) || n < 0)
-        next.newLeaves = 'Enter a whole number ≥ 0.'
+    if (leafingNoRoot.trim() && !wholeNonNeg(leafingNoRoot)) {
+      next.leafingNoRoot = 'Whole number ≥ 0.'
     }
+
     if (deaths.trim()) {
-      const n = Number(deaths)
-      if (!Number.isInteger(n) || n < 0) {
+      if (!wholeNonNeg(deaths)) {
         next.deaths = 'Enter a whole number ≥ 0.'
-      } else if (aliveBefore != null && n > aliveBefore) {
+      } else if (aliveBefore != null && Number(deaths) > aliveBefore) {
         next.deaths = `Only ${aliveBefore} plant${
           aliveBefore === 1 ? '' : 's'
         } still alive to record.`
       }
-      if (n > 0 && !deathCause.trim())
+      if (Number(deaths) > 0 && !deathCause.trim())
         next.deathCause = 'Say what caused the loss.'
     }
     setErrors(next)
@@ -160,7 +201,10 @@ export default function DateLogForm({
       navigate(backTo, {
         replace: true,
         state: {
-          toast: kind === 'watered' ? 'Logged: watered today.' : 'Logged: fertilized today.',
+          toast:
+            kind === 'watered'
+              ? 'Logged: watered today.'
+              : 'Logged: fertilized today.',
           ...doneState,
         },
       })
@@ -188,12 +232,25 @@ export default function DateLogForm({
       if (image) imageUrl = await uploadImage(image, user.id)
 
       const deathsN = deaths.trim() ? Number(deaths) : 0
+      // The stage section saves as a unit: touch any of it and every bucket is
+      // written (blank = 0); leave it alone and every bucket stays null.
+      const stageFields = Object.fromEntries(
+        STAGE_KEYS.map((k) => [
+          k,
+          stagesTouched ? (stages[k].trim() ? Number(stages[k]) : 0) : null,
+        ]),
+      )
+
       const fields = {
         log_date: logDate,
         status_details: statusDetails.trim(),
         image_url: imageUrl,
-        root_length_mm: rootLength.trim() ? Number(rootLength) : null,
-        new_leaves: newLeaves.trim() ? Number(newLeaves) : null,
+        ...stageFields,
+        leafing_without_rooting: stagesTouched
+          ? leafingNoRoot.trim()
+            ? Number(leafingNoRoot)
+            : 0
+          : null,
         deaths_count: deathsN,
         death_cause: deathsN > 0 ? deathCause.trim() : null,
       }
@@ -250,59 +307,102 @@ export default function DateLogForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-        Status details *
+        Notes
         <textarea
-          rows={4}
+          rows={3}
           value={statusDetails}
           onChange={(e) => setStatusDetails(e.target.value)}
+          placeholder="Batch notes for this check-in (optional)."
           className={inputClass}
         />
-        {errors.statusDetails && (
-          <span className="text-xs text-error">{errors.statusDetails}</span>
-        )}
       </label>
 
-      <div className="grid grid-cols-2 gap-3">
-        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          Root length (mm)
-          <input
-            type="number"
-            min={0}
-            step="any"
-            inputMode="decimal"
-            value={rootLength}
-            onChange={(e) => setRootLength(e.target.value)}
-            className={inputClass}
-          />
-          {errors.rootLength && (
-            <span className="text-xs text-error">{errors.rootLength}</span>
-          )}
-        </label>
+      <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
+        <legend className="px-1 text-sm text-on-surface-variant">
+          Root track — plants at each stage
+        </legend>
+        <div className="grid grid-cols-3 gap-3">
+          {ROOT_STAGES.map((s) => (
+            <label
+              key={s.key}
+              className="flex flex-col gap-1 text-xs text-on-surface-variant"
+            >
+              <span className="font-medium text-on-surface">{s.code}</span>
+              <span className="min-h-8 leading-tight">{s.label}</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={stages[s.key]}
+                onChange={(e) => setStage(s.key, e.target.value)}
+                className={inputClass}
+              />
+              {errors[s.key] && (
+                <span className="text-error">{errors[s.key]}</span>
+              )}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
+        <legend className="px-1 text-sm text-on-surface-variant">
+          Shoot / leaf track — plants at each stage
+        </legend>
+        <div className="grid grid-cols-4 gap-2">
+          {SHOOT_STAGES.map((s) => (
+            <label
+              key={s.key}
+              className="flex flex-col gap-1 text-xs text-on-surface-variant"
+            >
+              <span className="font-medium text-on-surface">{s.code}</span>
+              <span className="min-h-10 leading-tight">{s.label}</span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={stages[s.key]}
+                onChange={(e) => setStage(s.key, e.target.value)}
+                className={inputClass}
+              />
+              {errors[s.key] && (
+                <span className="text-error">{errors[s.key]}</span>
+              )}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
+        <legend className="px-1 text-sm text-on-surface-variant">
+          This check-in
+        </legend>
 
         <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-          New leaves
+          Leafing without rooting
           <input
             type="number"
             min={0}
             step={1}
             inputMode="numeric"
-            value={newLeaves}
-            onChange={(e) => setNewLeaves(e.target.value)}
+            value={leafingNoRoot}
+            onChange={(e) => setLeafingNoRoot(e.target.value)}
             className={inputClass}
           />
-          {errors.newLeaves && (
-            <span className="text-xs text-error">{errors.newLeaves}</span>
+          <span className="text-xs text-on-surface-variant">
+            Plants pushing a leaf (S1+) with no root yet (R0) — spending reserves
+            they can't replace. Count them here; it can't be derived.
+          </span>
+          {errors.leafingNoRoot && (
+            <span className="text-xs text-error">{errors.leafingNoRoot}</span>
           )}
         </label>
-      </div>
 
-      <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
-        <legend className="px-1 text-sm text-on-surface-variant">
-          Plant losses
-        </legend>
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
-            Plants died
+            Dead / removed
             <input
               type="number"
               min={0}
@@ -317,8 +417,11 @@ export default function DateLogForm({
                   return
                 }
                 const n = Number(raw)
-                // Never let this entry record more deaths than plants left alive.
-                if (aliveBefore != null && Number.isFinite(n) && n > aliveBefore) {
+                if (
+                  aliveBefore != null &&
+                  Number.isFinite(n) &&
+                  n > aliveBefore
+                ) {
                   setDeaths(String(aliveBefore))
                 } else {
                   setDeaths(raw)
@@ -357,6 +460,20 @@ export default function DateLogForm({
           ))}
         </datalist>
       </fieldset>
+
+      {warnings.length > 0 && (
+        <div className="flex flex-col gap-1.5 rounded-lg bg-surface-container px-3 py-2 text-xs text-on-surface-variant">
+          {warnings.map((w) => (
+            <p key={w} className="flex items-start gap-1.5">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-error" />
+              <span>{w}</span>
+            </p>
+          ))}
+          <p className="text-on-surface-variant/70">
+            Saving is fine — this is just a nudge to double-check the counts.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
         Photo
