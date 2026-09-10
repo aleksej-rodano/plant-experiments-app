@@ -363,7 +363,6 @@ export default function StatsPage() {
                   <th className="pb-1 px-2 font-medium">Rooted</th>
                   <th className="pb-1 px-2 font-medium">Any shoot</th>
                   <th className="pb-1 px-2 font-medium">Established</th>
-                  <th className="pb-1 pl-2 font-medium">Leaf, no root</th>
                 </tr>
               </thead>
               <tbody className="text-on-surface">
@@ -391,11 +390,6 @@ export default function StatsPage() {
                         {snap.pctEstablished == null
                           ? '—'
                           : `${Math.round(snap.pctEstablished)}%`}
-                      </td>
-                      <td className="py-1 pl-2">
-                        {snap.entry.leafingWithoutRooting}
-                        {snap.pctLeafingWithoutRooting != null &&
-                          ` (${Math.round(snap.pctLeafingWithoutRooting)}%)`}
                       </td>
                     </tr>
                   )
