@@ -1,4 +1,3 @@
-import { TriangleAlert } from 'lucide-react'
 import { ROOT_STAGES, SHOOT_STAGES, stageSnapshot } from '../lib/utils/stages'
 import type { DateLog } from '../types/database'
 
@@ -56,15 +55,13 @@ function StageRow({
 
 /**
  * The most recent stage tally for one experiment: exact bucket counts +
- * percentages for both tracks, the cumulative-progress read, and the
- * leafing-without-rooting flag called out on its own.
+ * percentages for both tracks.
  */
 export default function StageSnapshot({ logs, startedCount }: Props) {
   const snap = stageSnapshot(logs, startedCount)
   if (!snap) return null
 
   const { entry, rootPct, shootPct } = snap
-  const denom = snap.started
 
   return (
     <section className="rounded-lg bg-surface-container p-3">
@@ -85,44 +82,12 @@ export default function StageSnapshot({ logs, startedCount }: Props) {
           />
         </div>
         <div>
-          <div className="mb-1 text-xs text-on-surface-variant">
-            Shoot / leaf track
-          </div>
+          <div className="mb-1 text-xs text-on-surface-variant">Leaf track</div>
           <StageRow
             codes={SHOOT_STAGES.map((s) => s.code)}
             counts={entry.shoot}
             percents={shootPct}
           />
-        </div>
-
-        <dl className="grid grid-cols-3 gap-2 text-center">
-          {[
-            { label: 'Rooted (R≥1)', value: snap.pctRooted },
-            { label: 'Any shoot (S≥1)', value: snap.pctAnyShoot },
-            { label: 'Established (S3)', value: snap.pctEstablished },
-          ].map((m) => (
-            <div key={m.label} className="rounded-lg bg-surface px-2 py-1.5">
-              <dt className="text-xs text-on-surface-variant">{m.label}</dt>
-              <dd className="text-sm font-medium text-on-surface">
-                {pct(m.value)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-
-        <div
-          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-            entry.leafingWithoutRooting > 0
-              ? 'bg-error-container text-on-error-container'
-              : 'bg-surface text-on-surface-variant'
-          }`}
-        >
-          <TriangleAlert className="size-4 shrink-0" />
-          <span>
-            Leafing without rooting:{' '}
-            <span className="font-medium">{entry.leafingWithoutRooting}</span>
-            {denom != null && ` / ${denom} (${pct(snap.pctLeafingWithoutRooting)})`}
-          </span>
         </div>
       </div>
     </section>

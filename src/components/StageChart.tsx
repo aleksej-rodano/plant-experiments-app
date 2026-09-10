@@ -13,9 +13,9 @@ const M = { top: 10, right: 10, bottom: 44, left: 28 }
 const PW = VW - M.left - M.right
 const PH = VH - M.top - M.bottom
 
-// Darker = further along the track.
-const ROOT_FILL = ['#c8e6c9', '#66bb6a', '#1b5e20']
-const SHOOT_FILL = ['#cfd8dc', '#80cbc4', '#26a69a', '#00695c']
+// Darker = further along the track. Leaf track is the green spectrum.
+const ROOT_FILL = ['#cfd8dc', '#26a69a', '#00695c']
+const SHOOT_FILL = ['#c8e6c9', '#81c784', '#43a047', '#1b5e20']
 
 function StackedBars({
   trend,
@@ -235,7 +235,7 @@ export default function StageChart({ logs }: Props) {
         trend={trend}
         fills={SHOOT_FILL}
         codes={SHOOT_STAGES.map((s) => s.code)}
-        title="Shoot / leaf track"
+        title="Leaf track"
         pick={(p) => p.shoot}
       />
       <CumulativeDeaths logs={logs} />

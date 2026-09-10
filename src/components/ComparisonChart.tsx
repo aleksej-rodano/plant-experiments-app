@@ -71,7 +71,6 @@ function SnapshotTable({ experiments, logs }: Props) {
             <th className="pb-1 px-2 font-medium">Rooted</th>
             <th className="pb-1 px-2 font-medium">Any shoot</th>
             <th className="pb-1 px-2 font-medium">Established</th>
-            <th className="pb-1 pl-2 font-medium">Leaf, no root</th>
           </tr>
         </thead>
         <tbody className="text-on-surface">
@@ -81,13 +80,6 @@ function SnapshotTable({ experiments, logs }: Props) {
               <td className="px-2 py-1">{fmtPct(snap.pctRooted)}</td>
               <td className="px-2 py-1">{fmtPct(snap.pctAnyShoot)}</td>
               <td className="px-2 py-1">{fmtPct(snap.pctEstablished)}</td>
-              <td className="py-1 pl-2">
-                {snap.entry.leafingWithoutRooting}
-                <span className="text-on-surface-variant">
-                  {' '}
-                  ({fmtPct(snap.pctLeafingWithoutRooting)})
-                </span>
-              </td>
             </tr>
           ))}
         </tbody>

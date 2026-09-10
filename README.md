@@ -19,11 +19,10 @@ The app is organised in three levels:
    (e.g. "rooting powder", "smaller cuttings", "control"). You give it a name, the
    number of plants involved, notes, and an initial photo.
 3. **Log entries** — inside an experiment, you add dated check-ins: how many
-   plants sit in each root/shoot stage that day, with an optional photo and
+   plants sit in each root/leaf stage that day, with an optional photo and
    note. These stack up into a timeline, topped by a **latest-check-in
-   snapshot** (counts + percentages for both tracks, % rooted / shoot /
-   established, and the leafing-without-rooting flag) and **trend charts**
-   showing the stage distribution across every check-in. Tap any photo in the
+   snapshot** (counts + percentages for the root and leaf tracks) and **trend
+   charts** showing the stage distribution across every check-in. Tap any photo in the
    timeline (or on a note) to open it full-screen, then pinch or double-tap to
    zoom in and drag to pan.
 
@@ -32,7 +31,7 @@ Three ways to add a log entry, depending on how much you want to type:
 - **Add Log Entry** — the full check-in. Instead of measuring one plant, you
   tally how many plants sit in each stage right now, on two independent scales:
   - **Root track** — R0 no root · R1 initiation (<2 mm) · R2 elongation (≥2 mm)
-  - **Shoot / leaf track** — S0 none · S1 bud/leaf closed · S2 leaf unfolded ·
+  - **Leaf track** — S0 none · S1 bud/leaf closed · S2 leaf unfolded ·
     S3 established
   Plus a **dead / removed** count with cause, and a **leafing without rooting**
   count — plants pushing a leaf with no root yet, an early risk signal that has
@@ -61,8 +60,8 @@ Comparing experiments is the point of the app, so a folder with more than one
 experiment also shows:
 
 - **A survival chart** overlaying every experiment on shared axes, plus a
-  **latest-snapshot table** — % rooted, % with any shoot, % established and the
-  leafing-without-rooting count for each experiment side by side.
+  **latest-snapshot table** — % rooted, % with any shoot and % established for
+  each experiment side by side.
 - **A verdict line** naming the best treatment so far and the fastest to root.
 
 Other tabs:

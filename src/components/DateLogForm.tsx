@@ -348,7 +348,7 @@ export default function DateLogForm({
 
       <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
         <legend className="px-1 text-sm text-on-surface-variant">
-          Shoot / leaf track — plants at each stage
+          Leaf track — plants at each stage
         </legend>
         <div className="grid grid-cols-4 gap-2">
           {SHOOT_STAGES.map((s) => (
