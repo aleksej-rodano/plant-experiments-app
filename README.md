@@ -30,7 +30,7 @@ Three ways to add a log entry, depending on how much you want to type:
 
 - **Add Log Entry** — the full check-in. Instead of measuring one plant, you
   tally how many plants sit in each stage right now, on two independent scales:
-  - **Root track** — R0 no root · R1 initiation (<2 mm) · R2 elongation (≥2 mm)
+  - **Root track** — R0 no root · R1 initiation (<5 mm) · R2 elongation (≥5 mm)
   - **Leaf track** — S0 none · S1 bud/leaf closed · S2 leaf unfolded ·
     S3 established
   Plus a **dead / removed** count with cause, and a **leafing without rooting**

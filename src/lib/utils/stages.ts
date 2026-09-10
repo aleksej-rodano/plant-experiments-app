@@ -10,8 +10,8 @@ const DAY = 86_400_000
  */
 export const ROOT_STAGES = [
   { key: 'r0_count', code: 'R0', label: 'No root' },
-  { key: 'r1_count', code: 'R1', label: 'Root initiation (<2 mm)' },
-  { key: 'r2_count', code: 'R2', label: 'Root elongation (≥2 mm)' },
+  { key: 'r1_count', code: 'R1', label: 'Root initiation (<5 mm)' },
+  { key: 'r2_count', code: 'R2', label: 'Root elongation (≥5 mm)' },
 ] as const
 
 export const SHOOT_STAGES = [
