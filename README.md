@@ -62,12 +62,12 @@ experiment also shows:
 - **A survival chart** overlaying every experiment on shared axes, plus a
   **latest-snapshot table** — % rooted, % with any shoot and % established for
   each experiment side by side.
+- **Rooted / Shoots / Established tables** — one table per stage, each
+  plotting every experiment's progress over time (x-axis = check-in date).
 - **A verdict line** naming the best treatment so far and the fastest to root.
 
 Other tabs:
 
-- **Stats** — everything across every folder: overall survival, median days to
-  root, and survival broken down by treatment, folder, and origin.
 - **Fertilizer Log** — a simple running list of the dates you fed your plants,
   plus a feeding guide: frequency by season, and how long to wait before feeding
   freshly potted plants (6–8 weeks) or ones just bought from a garden centre
@@ -161,8 +161,8 @@ Working today:
   flags get their own column in the CSV export, so every watering / feeding date
   is in the sheet.
 - **Comparison charts and a verdict** on which treatment is winning inside a
-  folder, including how many days each took to root
-- **Stats** across every folder — survival by treatment, folder, and origin
+  folder, including how many days each took to root, plus per-stage
+  (Rooted / Shoots / Established) tables of progress over time
 - **Recurring reminders** on a folder *and* on each experiment (both optional) —
   a task label and a repeat interval, with overdue badges on the folder list. On
   the Android app these also fire a phone notification at 11:00 each day that

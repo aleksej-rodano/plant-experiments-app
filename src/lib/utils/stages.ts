@@ -205,3 +205,60 @@ export const reachedRoot = (e: StageEntry) => e.root[1] + e.root[2] > 0
 export const reachedShoot = (e: StageEntry) =>
   e.shoot[1] + e.shoot[2] + e.shoot[3] > 0
 export const reachedEstablished = (e: StageEntry) => e.shoot[3] > 0
+
+export interface StagePctPoint {
+  t: number
+  value: number
+}
+
+/**
+ * % rooted / % any-shoot / % established at each check-in, oldest first — the
+ * input to the per-stage comparison charts. Empty without a plant count to
+ * divide by. One point per date: a later entry on the same day supersedes the
+ * earlier, same tie-break as `latestStageLog`.
+ */
+export function stagePctSeries(
+  logs: DateLog[],
+  startedCount: number | null,
+): {
+  rooted: StagePctPoint[]
+  anyShoot: StagePctPoint[]
+  established: StagePctPoint[]
+} {
+  const empty = { rooted: [], anyShoot: [], established: [] }
+  const d = startedCount && startedCount > 0 ? startedCount : null
+  if (d == null) return empty
+
+  const withStages = logs
+    .map((log) => ({ log, entry: stageEntry(log) }))
+    .filter((x): x is { log: DateLog; entry: StageEntry } => x.entry !== null)
+    .sort((a, b) =>
+      a.log.log_date === b.log.log_date
+        ? a.log.created_at < b.log.created_at
+          ? -1
+          : 1
+        : a.log.log_date < b.log.log_date
+          ? -1
+          : 1,
+    )
+
+  const rooted: StagePctPoint[] = []
+  const anyShoot: StagePctPoint[] = []
+  const established: StagePctPoint[] = []
+  const push = (arr: StagePctPoint[], t: number, value: number) => {
+    const existing = arr.findIndex((p) => p.t === t)
+    if (existing >= 0) arr[existing] = { t, value }
+    else arr.push({ t, value })
+  }
+  for (const { log, entry } of withStages) {
+    const t = dayMs(log.log_date)
+    push(rooted, t, ((entry.root[1] + entry.root[2]) / d) * 100)
+    push(
+      anyShoot,
+      t,
+      ((entry.shoot[1] + entry.shoot[2] + entry.shoot[3]) / d) * 100,
+    )
+    push(established, t, (entry.shoot[3] / d) * 100)
+  }
+  return { rooted, anyShoot, established }
+}

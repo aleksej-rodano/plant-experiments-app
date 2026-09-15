@@ -8,7 +8,7 @@ import {
   ticks,
 } from '../lib/utils/chart'
 import { survivalSeries } from '../lib/utils/insights'
-import { stageSnapshot } from '../lib/utils/stages'
+import { stagePctSeries, stageSnapshot } from '../lib/utils/stages'
 import type { DateLog, Experiment } from '../types/database'
 
 interface Props {
@@ -280,6 +280,18 @@ export default function ComparisonChart({ experiments, logs }: Props) {
   const survival = build((expLogs, exp) => survivalSeries(exp, expLogs))
   const hasSurvival = survival.some((s) => s.points.length > 0)
 
+  const rooted = build(
+    (expLogs, exp) => stagePctSeries(expLogs, exp.plant_count ?? null).rooted,
+  )
+  const shoots = build(
+    (expLogs, exp) =>
+      stagePctSeries(expLogs, exp.plant_count ?? null).anyShoot,
+  )
+  const established = build(
+    (expLogs, exp) =>
+      stagePctSeries(expLogs, exp.plant_count ?? null).established,
+  )
+
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {hasSurvival && (
@@ -291,6 +303,14 @@ export default function ComparisonChart({ experiments, logs }: Props) {
         />
       )}
       <SnapshotTable experiments={experiments} logs={logs} />
+      <MultiChart series={rooted} title="Rooted (%)" unit="%" fixedMax={100} />
+      <MultiChart series={shoots} title="Shoots (%)" unit="%" fixedMax={100} />
+      <MultiChart
+        series={established}
+        title="Established (%)"
+        unit="%"
+        fixedMax={100}
+      />
     </div>
   )
 }

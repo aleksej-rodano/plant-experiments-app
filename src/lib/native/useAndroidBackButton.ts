@@ -7,7 +7,6 @@ import { consumeBack } from './backInterceptor'
 // Experiments home; pressing it again on Experiments exits the app.
 const ROOT_ROUTES = new Set([
   '/experiments',
-  '/stats',
   '/fertilizer-log',
   '/pest-control',
   '/tips',

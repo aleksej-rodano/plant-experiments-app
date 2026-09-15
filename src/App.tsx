@@ -22,7 +22,6 @@ import PestControlPage from './pages/PestControlPage'
 import QuickPhotoLogPage from './pages/QuickPhotoLogPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
-import StatsPage from './pages/StatsPage'
 import TipsPage from './pages/TipsPage'
 
 function FullScreenLoader() {
@@ -112,7 +111,6 @@ function App() {
               path="/experiments/:id/logs/:logId/edit"
               element={<EditDateLogPage />}
             />
-            <Route path="/stats" element={<StatsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/bin" element={<BinPage />} />
             <Route path="/fertilizer-log" element={<FertilizerLogPage />} />

@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   Bug,
   Droplets,
   Lightbulb,
@@ -22,7 +21,6 @@ let sweptThisSession = false
 // mobile bottom bar.
 const NAV = [
   { to: '/experiments', label: 'Experiments', short: 'Exp.', icon: Sprout },
-  { to: '/stats', label: 'Stats', icon: BarChart3 },
   { to: '/fertilizer-log', label: 'Fertilizer Log', short: 'Feeding', icon: Droplets },
   { to: '/pest-control', label: 'Pest Control', short: 'Pests', icon: Bug },
   { to: '/tips', label: 'Tips', icon: Lightbulb },
