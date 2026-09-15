@@ -211,6 +211,12 @@ export interface StagePctPoint {
   value: number
 }
 
+/** Round to 3 significant figures (e.g. 33.333333… -> 33.3, 5.263… -> 5.26). */
+function round3sf(n: number): number {
+  if (n === 0) return 0
+  return Number(n.toPrecision(3))
+}
+
 /**
  * % rooted / % any-shoot / % established at each check-in, oldest first — the
  * input to the per-stage comparison charts. Empty without a plant count to
@@ -252,13 +258,13 @@ export function stagePctSeries(
   }
   for (const { log, entry } of withStages) {
     const t = dayMs(log.log_date)
-    push(rooted, t, ((entry.root[1] + entry.root[2]) / d) * 100)
+    push(rooted, t, round3sf(((entry.root[1] + entry.root[2]) / d) * 100))
     push(
       anyShoot,
       t,
-      ((entry.shoot[1] + entry.shoot[2] + entry.shoot[3]) / d) * 100,
+      round3sf(((entry.shoot[1] + entry.shoot[2] + entry.shoot[3]) / d) * 100),
     )
-    push(established, t, (entry.shoot[3] / d) * 100)
+    push(established, t, round3sf((entry.shoot[3] / d) * 100))
   }
   return { rooted, anyShoot, established }
 }

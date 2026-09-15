@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   AXIS,
   GRID,
@@ -25,8 +26,18 @@ interface Point {
 interface Series {
   label: string
   color: string
+  /** SVG `stroke-dasharray`; omit for a solid line. */
+  dash?: string
   points: Point[]
 }
+
+type StageKey = 'rooted' | 'shoots' | 'established'
+
+const STAGE_META: { key: StageKey; label: string; dash?: string }[] = [
+  { key: 'rooted', label: 'Rooted' },
+  { key: 'shoots', label: 'Shoots', dash: '5 3' },
+  { key: 'established', label: 'Established', dash: '1 2' },
+]
 
 // Wider than the single-experiment chart: these carry several lines at once.
 const VW = 360
@@ -215,6 +226,7 @@ function MultiChart({
                 fill="none"
                 stroke={s.color}
                 strokeWidth={1.5}
+                strokeDasharray={s.dash}
               />
             )}
             {/* Keyed by index, not date: two entries can share a log_date. */}
@@ -237,11 +249,17 @@ function MultiChart({
             key={s.label}
             className="flex items-center gap-1.5 text-xs text-on-surface-variant"
           >
-            <span
-              aria-hidden
-              className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: s.color }}
-            />
+            <svg width="14" height="8" aria-hidden className="shrink-0">
+              <line
+                x1={0}
+                y1={4}
+                x2={14}
+                y2={4}
+                stroke={s.color}
+                strokeWidth={1.5}
+                strokeDasharray={s.dash}
+              />
+            </svg>
             <span className="truncate">
               {s.label}
               {unit && s.points.length > 0
@@ -252,6 +270,75 @@ function MultiChart({
         ))}
       </ul>
     </figure>
+  )
+}
+
+/**
+ * Rooted / Shoots / Established, all on one chart — same color per experiment
+ * as the survival chart, distinguished by line style, with checkboxes to
+ * toggle each stage on or off.
+ */
+function StageComparisonChart({ experiments, logs }: Props) {
+  const [enabled, setEnabled] = useState<Record<StageKey, boolean>>({
+    rooted: true,
+    shoots: true,
+    established: true,
+  })
+
+  const byExp = new Map<string, DateLog[]>()
+  for (const log of logs) {
+    const list = byExp.get(log.experiment_id)
+    if (list) list.push(log)
+    else byExp.set(log.experiment_id, [log])
+  }
+
+  const series: Series[] = []
+  experiments.forEach((exp, i) => {
+    const pct = stagePctSeries(byExp.get(exp.id) ?? [], exp.plant_count ?? null)
+    const byStage: Record<StageKey, Point[]> = {
+      rooted: pct.rooted,
+      shoots: pct.anyShoot,
+      established: pct.established,
+    }
+    for (const { key, label, dash } of STAGE_META) {
+      if (!enabled[key]) continue
+      series.push({
+        label: `${exp.title} · ${label}`,
+        color: seriesColor(i),
+        dash,
+        points: byStage[key],
+      })
+    }
+  })
+
+  const hasData = series.some((s) => s.points.length > 0)
+
+  return (
+    <div className="min-w-0 sm:col-span-2">
+      <div className="mb-2 flex flex-wrap gap-3 rounded-lg bg-surface-container p-3 text-xs text-on-surface-variant">
+        {STAGE_META.map(({ key, label }) => (
+          <label key={key} className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={enabled[key]}
+              onChange={() =>
+                setEnabled((prev) => ({ ...prev, [key]: !prev[key] }))
+              }
+            />
+            {label}
+          </label>
+        ))}
+        {!hasData && <span>Nothing to show — tick at least one stage.</span>}
+      </div>
+      {hasData && (
+        <MultiChart
+          series={series}
+          title="Stage progress (%)"
+          unit="%"
+          fixedMax={100}
+        />
+      )}
+    </div>
   )
 }
 
@@ -280,18 +367,6 @@ export default function ComparisonChart({ experiments, logs }: Props) {
   const survival = build((expLogs, exp) => survivalSeries(exp, expLogs))
   const hasSurvival = survival.some((s) => s.points.length > 0)
 
-  const rooted = build(
-    (expLogs, exp) => stagePctSeries(expLogs, exp.plant_count ?? null).rooted,
-  )
-  const shoots = build(
-    (expLogs, exp) =>
-      stagePctSeries(expLogs, exp.plant_count ?? null).anyShoot,
-  )
-  const established = build(
-    (expLogs, exp) =>
-      stagePctSeries(expLogs, exp.plant_count ?? null).established,
-  )
-
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       {hasSurvival && (
@@ -303,14 +378,7 @@ export default function ComparisonChart({ experiments, logs }: Props) {
         />
       )}
       <SnapshotTable experiments={experiments} logs={logs} />
-      <MultiChart series={rooted} title="Rooted (%)" unit="%" fixedMax={100} />
-      <MultiChart series={shoots} title="Shoots (%)" unit="%" fixedMax={100} />
-      <MultiChart
-        series={established}
-        title="Established (%)"
-        unit="%"
-        fixedMax={100}
-      />
+      <StageComparisonChart experiments={experiments} logs={logs} />
     </div>
   )
 }
