@@ -125,6 +125,74 @@ export function stageSnapshot(
   }
 }
 
+export interface StageDelta {
+  log: DateLog
+  entry: StageEntry
+  previousLog: DateLog | null
+  previousEntry: StageEntry | null
+  /** Days between this check-in and the previous stage-carrying one. */
+  daysSincePrevious: number | null
+  /** Change in (R1 + R2) since the previous stage check-in, or null without one. */
+  rootedDelta: number | null
+  /** Change in (S1 + S2 + S3) since the previous stage check-in. */
+  leafDelta: number | null
+  /** Change in S3 since the previous stage check-in. */
+  establishedDelta: number | null
+  /** Deaths logged strictly after the previous stage check-in, up to and including this one. */
+  deathsSincePrevious: number
+}
+
+/**
+ * What changed between the two most recent stage-carrying check-ins — the
+ * input to the "since last check-in" summary, which reads better than
+ * restating every bucket count each time.
+ */
+export function stageDelta(logs: DateLog[]): StageDelta | null {
+  const sorted = [...logs].filter(hasStageData).sort((a, b) =>
+    a.log_date === b.log_date
+      ? a.created_at < b.created_at
+        ? 1
+        : -1
+      : a.log_date < b.log_date
+        ? 1
+        : -1,
+  )
+  if (sorted.length === 0) return null
+
+  const log = sorted[0]
+  const entry = stageEntry(log)!
+  const previousLog = sorted[1] ?? null
+  const previousEntry = previousLog ? stageEntry(previousLog) : null
+
+  const rooted = (e: StageEntry) => e.root[1] + e.root[2]
+  const leaf = (e: StageEntry) => e.shoot[1] + e.shoot[2] + e.shoot[3]
+  const established = (e: StageEntry) => e.shoot[3]
+
+  const lowerBound = previousLog ? dayMs(previousLog.log_date) : -Infinity
+  const deathsSincePrevious = logs
+    .filter(
+      (l) =>
+        dayMs(l.log_date) > lowerBound && dayMs(l.log_date) <= dayMs(log.log_date),
+    )
+    .reduce((sum, l) => sum + (l.deaths_count ?? 0), 0)
+
+  return {
+    log,
+    entry,
+    previousLog,
+    previousEntry,
+    daysSincePrevious: previousLog
+      ? Math.round((dayMs(log.log_date) - dayMs(previousLog.log_date)) / DAY)
+      : null,
+    rootedDelta: previousEntry ? rooted(entry) - rooted(previousEntry) : null,
+    leafDelta: previousEntry ? leaf(entry) - leaf(previousEntry) : null,
+    establishedDelta: previousEntry
+      ? established(entry) - established(previousEntry)
+      : null,
+    deathsSincePrevious,
+  }
+}
+
 /**
  * Soft reconciliation checks — every message is a nudge to double-check entry,
  * never a reason to block saving. Lag between counting the two tracks is normal.

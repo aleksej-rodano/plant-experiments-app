@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useState } from 'react'
 import {
   AXIS,
@@ -9,7 +10,7 @@ import {
   ticks,
 } from '../lib/utils/chart'
 import { survivalSeries } from '../lib/utils/insights'
-import { stagePctSeries, stageSnapshot } from '../lib/utils/stages'
+import { stageDelta, stagePctSeries, stageSnapshot } from '../lib/utils/stages'
 import type { DateLog, Experiment } from '../types/database'
 
 interface Props {
@@ -50,7 +51,44 @@ function fmtPct(n: number | null) {
   return n == null ? '—' : `${Math.round(n)}%`
 }
 
-/** Latest stage snapshot per experiment, side by side. */
+/** Percentage-point change since the previous check-in, or null without one. */
+function pctDelta(countDelta: number | null, denom: number | null) {
+  if (countDelta == null || !denom) return null
+  return Math.round((countDelta / denom) * 100)
+}
+
+/** A percentage plus a small trend arrow showing the move since last check-in. */
+function TrendCell({
+  value,
+  delta,
+}: {
+  value: number | null
+  delta: number | null
+}) {
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {fmtPct(value)}
+      {delta != null && delta !== 0 && (
+        <span
+          className={`inline-flex items-center ${
+            delta > 0 ? 'text-green-700' : 'text-red-600'
+          }`}
+          title={`${delta > 0 ? '+' : ''}${delta}pp since previous check-in`}
+        >
+          {delta > 0 ? (
+            <ArrowUp className="size-2.5" />
+          ) : (
+            <ArrowDown className="size-2.5" />
+          )}
+          {Math.abs(delta)}
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** Latest stage snapshot per experiment, side by side, with trend vs. the
+ * previous check-in so a bare percentage doesn't have to speak for itself. */
 function SnapshotTable({ experiments, logs }: Props) {
   const byExp = new Map<string, DateLog[]>()
   for (const log of logs) {
@@ -60,12 +98,25 @@ function SnapshotTable({ experiments, logs }: Props) {
   }
 
   const rows = experiments
-    .map((exp) => ({
-      exp,
-      snap: stageSnapshot(byExp.get(exp.id) ?? [], exp.plant_count ?? null),
-    }))
-    .filter((r): r is { exp: Experiment; snap: NonNullable<typeof r.snap> } =>
-      Boolean(r.snap),
+    .map((exp) => {
+      const expLogs = byExp.get(exp.id) ?? []
+      const denom = exp.plant_count ?? null
+      return {
+        exp,
+        snap: stageSnapshot(expLogs, denom),
+        delta: stageDelta(expLogs),
+        denom,
+      }
+    })
+    .filter(
+      (
+        r,
+      ): r is {
+        exp: Experiment
+        snap: NonNullable<typeof r.snap>
+        delta: NonNullable<typeof r.delta>
+        denom: number | null
+      } => Boolean(r.snap) && Boolean(r.delta),
     )
 
   if (rows.length === 0) return null
@@ -73,7 +124,7 @@ function SnapshotTable({ experiments, logs }: Props) {
   return (
     <figure className="min-w-0 overflow-x-auto rounded-lg bg-surface-container p-3">
       <figcaption className="mb-2 text-xs text-on-surface-variant">
-        Latest snapshot — each experiment
+        Latest snapshot — each experiment, vs. its previous check-in
       </figcaption>
       <table className="w-full text-left text-xs">
         <thead className="text-on-surface-variant">
@@ -85,12 +136,27 @@ function SnapshotTable({ experiments, logs }: Props) {
           </tr>
         </thead>
         <tbody className="text-on-surface">
-          {rows.map(({ exp, snap }) => (
+          {rows.map(({ exp, snap, delta, denom }) => (
             <tr key={exp.id} className="border-t border-outline-variant">
               <td className="max-w-32 truncate py-1 pr-2">{exp.title}</td>
-              <td className="px-2 py-1">{fmtPct(snap.pctRooted)}</td>
-              <td className="px-2 py-1">{fmtPct(snap.pctAnyShoot)}</td>
-              <td className="px-2 py-1">{fmtPct(snap.pctEstablished)}</td>
+              <td className="px-2 py-1">
+                <TrendCell
+                  value={snap.pctRooted}
+                  delta={pctDelta(delta.rootedDelta, denom)}
+                />
+              </td>
+              <td className="px-2 py-1">
+                <TrendCell
+                  value={snap.pctAnyShoot}
+                  delta={pctDelta(delta.leafDelta, denom)}
+                />
+              </td>
+              <td className="px-2 py-1">
+                <TrendCell
+                  value={snap.pctEstablished}
+                  delta={pctDelta(delta.establishedDelta, denom)}
+                />
+              </td>
             </tr>
           ))}
         </tbody>

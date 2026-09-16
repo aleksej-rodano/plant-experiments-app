@@ -1,4 +1,4 @@
-import { ROOT_STAGES, SHOOT_STAGES, stageSnapshot } from '../lib/utils/stages'
+import { stageDelta, stageSnapshot } from '../lib/utils/stages'
 import type { DateLog } from '../types/database'
 
 interface Props {
@@ -19,49 +19,33 @@ function pct(n: number | null) {
   return n == null ? '—' : `${Math.round(n)}%`
 }
 
-function StageRow({
-  codes,
-  counts,
-  percents,
-}: {
-  codes: readonly string[]
-  counts: number[]
-  percents: number[] | null
-}) {
-  return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(0,1fr))] gap-2">
-      {codes.map((code, i) => (
-        <div
-          key={code}
-          className="rounded-lg bg-surface px-2 py-1.5 text-center"
-        >
-          <div className="text-xs font-medium text-on-surface-variant">
-            {code}
-          </div>
-          <div className="text-sm text-on-surface">
-            {counts[i]}
-            {percents && (
-              <span className="text-xs text-on-surface-variant">
-                {' '}
-                ({pct(percents[i])})
-              </span>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+function fmtSigned(n: number) {
+  return n > 0 ? `+${n}` : `${n}`
 }
 
 /**
- * The most recent stage tally for one experiment: exact bucket counts +
- * percentages for both tracks.
+ * The most recent stage tally for one experiment: current totals for both
+ * tracks, plus what changed since the previous check-in. The full history
+ * is already in the chart below this, so this only calls out what's new.
  */
 export default function StageSnapshot({ logs, startedCount }: Props) {
   const snap = stageSnapshot(logs, startedCount)
-  if (!snap) return null
+  const delta = stageDelta(logs)
+  if (!snap || !delta) return null
 
-  const { entry, rootPct, shootPct } = snap
+  const { entry } = snap
+  const rooted = entry.root[1] + entry.root[2]
+  const leafing = entry.shoot[1] + entry.shoot[2] + entry.shoot[3]
+  const established = entry.shoot[3]
+
+  const changeParts = delta.previousLog
+    ? [
+        `${fmtSigned(delta.rootedDelta ?? 0)} rooted`,
+        `${fmtSigned(delta.leafDelta ?? 0)} leafing`,
+        `${fmtSigned(delta.establishedDelta ?? 0)} established`,
+        `${fmtSigned(-delta.deathsSincePrevious)} died`,
+      ]
+    : null
 
   return (
     <section className="rounded-lg bg-surface-container p-3">
@@ -72,30 +56,27 @@ export default function StageSnapshot({ logs, startedCount }: Props) {
         </span>
       </h3>
 
-      <div className="flex flex-col gap-3">
-        <div>
-          <div className="mb-1 text-xs text-on-surface-variant">Root track</div>
-          <StageRow
-            codes={ROOT_STAGES.map((s) => s.code)}
-            counts={entry.root}
-            percents={rootPct}
-          />
-          <p className="mt-1 text-[11px] text-on-surface-variant">
-            {ROOT_STAGES.map((s) => `${s.code} ${s.label}`).join(' · ')}
-          </p>
-        </div>
-        <div>
-          <div className="mb-1 text-xs text-on-surface-variant">Leaf track</div>
-          <StageRow
-            codes={SHOOT_STAGES.map((s) => s.code)}
-            counts={entry.shoot}
-            percents={shootPct}
-          />
-          <p className="mt-1 text-[11px] text-on-surface-variant">
-            {SHOOT_STAGES.map((s) => `${s.code} ${s.label}`).join(' · ')}
-          </p>
-        </div>
-      </div>
+      <p className="text-sm text-on-surface">
+        {rooted} rooted{snap.pctRooted != null && ` (${pct(snap.pctRooted)})`}
+        {' · '}
+        {leafing} leafing{snap.pctAnyShoot != null && ` (${pct(snap.pctAnyShoot)})`}
+        {' · '}
+        {established} established
+        {snap.pctEstablished != null && ` (${pct(snap.pctEstablished)})`}
+      </p>
+
+      <p className="mt-1 text-xs text-on-surface-variant">
+        {changeParts ? (
+          <>
+            Since {formatLogDate(delta.previousLog!.log_date)}
+            {delta.daysSincePrevious != null &&
+              ` (${delta.daysSincePrevious}d ago)`}
+            : {changeParts.join(' · ')}
+          </>
+        ) : (
+          'First check-in with stage counts recorded.'
+        )}
+      </p>
     </section>
   )
 }
