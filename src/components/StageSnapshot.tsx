@@ -57,11 +57,16 @@ export default function StageSnapshot({ logs, startedCount }: Props) {
       </h3>
 
       <p className="text-sm text-on-surface">
-        {rooted} rooted{snap.pctRooted != null && ` (${pct(snap.pctRooted)})`}
+        {rooted}
+        {snap.started != null && `/${snap.started}`} rooted
+        {snap.pctRooted != null && ` (${pct(snap.pctRooted)})`}
         {' · '}
-        {leafing} leafing{snap.pctAnyShoot != null && ` (${pct(snap.pctAnyShoot)})`}
+        {leafing}
+        {snap.started != null && `/${snap.started}`} leafing
+        {snap.pctAnyShoot != null && ` (${pct(snap.pctAnyShoot)})`}
         {' · '}
-        {established} established
+        {established}
+        {snap.started != null && `/${snap.started}`} established
         {snap.pctEstablished != null && ` (${pct(snap.pctEstablished)})`}
       </p>
 
