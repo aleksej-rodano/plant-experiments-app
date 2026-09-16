@@ -1,4 +1,4 @@
-import { AXIS, GRID, LABEL, dayMs, fmtDate } from '../lib/utils/chart'
+import { AXIS, GRID, LABEL, dayMs, fmtDate, fmtTick } from '../lib/utils/chart'
 import { ROOT_STAGES, SHOOT_STAGES, stageTrend } from '../lib/utils/stages'
 import type { DateLog } from '../types/database'
 
@@ -12,6 +12,10 @@ const VH = 180
 const M = { top: 10, right: 10, bottom: 44, left: 28 }
 const PW = VW - M.left - M.right
 const PH = VH - M.top - M.bottom
+
+// The stacked-bar charts need a bit more left margin to fit y-axis counts.
+const BAR_M = { ...M, left: 34 }
+const BAR_PW = VW - BAR_M.left - BAR_M.right
 
 // Darker = further along the track. Grey means "no progress yet" in both
 // tracks; the leaf track then steps through a wide, high-contrast green ramp
@@ -38,55 +42,70 @@ function StackedBars({
 
   const totals = trend.map((p) => pick(p).reduce((a, b) => a + b, 0))
   const maxTotal = Math.max(1, ...totals)
+  // Whole-plant counts only — a fractional midpoint tick (e.g. "2.5") would be
+  // meaningless here, so round instead of using evenly-spaced decimal ticks.
+  const yTicks =
+    maxTotal <= 1 ? [0, maxTotal] : [0, Math.round(maxTotal / 2), maxTotal]
 
   const n = trend.length
-  const slot = PW / n
+  const slot = BAR_PW / n
   const barW = Math.min(28, slot * 0.7)
   const labelEvery = n > 8 ? 3 : n > 5 ? 2 : 1
 
   return (
     <figure className="min-w-0 rounded-lg bg-surface-container p-3">
       <figcaption className="mb-1 text-xs text-on-surface-variant">
-        {title}
+        {title} <span className="text-on-surface-variant/70">(plants)</span>
       </figcaption>
       <svg
         viewBox={`0 0 ${VW} ${VH}`}
         className="w-full"
         role="img"
-        aria-label={`${title} distribution across ${n} check-ins`}
+        aria-label={`${title} distribution across ${n} check-ins, in plant count`}
       >
         <line
-          x1={M.left}
-          y1={M.top}
-          x2={M.left}
-          y2={M.top + PH}
+          x1={BAR_M.left}
+          y1={BAR_M.top}
+          x2={BAR_M.left}
+          y2={BAR_M.top + PH}
           stroke={AXIS}
           strokeWidth={1}
         />
         <line
-          x1={M.left}
-          y1={M.top + PH}
-          x2={M.left + PW}
-          y2={M.top + PH}
+          x1={BAR_M.left}
+          y1={BAR_M.top + PH}
+          x2={BAR_M.left + BAR_PW}
+          y2={BAR_M.top + PH}
           stroke={AXIS}
           strokeWidth={1}
         />
-        {[0, 0.5, 1].map((f) => (
-          <line
-            key={f}
-            x1={M.left}
-            y1={M.top + PH - f * PH}
-            x2={M.left + PW}
-            y2={M.top + PH - f * PH}
-            stroke={GRID}
-            strokeWidth={0.5}
-          />
+        {yTicks.map((v) => (
+          <g key={v}>
+            <line
+              x1={BAR_M.left}
+              y1={BAR_M.top + PH - (v / maxTotal) * PH}
+              x2={BAR_M.left + BAR_PW}
+              y2={BAR_M.top + PH - (v / maxTotal) * PH}
+              stroke={GRID}
+              strokeWidth={0.5}
+            />
+            <text
+              x={BAR_M.left - 4}
+              y={BAR_M.top + PH - (v / maxTotal) * PH}
+              textAnchor="end"
+              dominantBaseline="middle"
+              fontSize={7}
+              fill={LABEL}
+            >
+              {fmtTick(v)}
+            </text>
+          </g>
         ))}
 
         {trend.map((p, i) => {
           const counts = pick(p)
-          const x = M.left + i * slot + (slot - barW) / 2
-          let yTop = M.top + PH
+          const x = BAR_M.left + i * slot + (slot - barW) / 2
+          let yTop = BAR_M.top + PH
           return (
             <g key={`${p.date}-${i}`}>
               {counts.map((c, li) => {
@@ -106,8 +125,8 @@ function StackedBars({
               {(i % labelEvery === 0 || i === n - 1) && (
                 <text
                   x={x + barW / 2}
-                  y={M.top + PH + 10}
-                  transform={`rotate(-45 ${x + barW / 2} ${M.top + PH + 10})`}
+                  y={BAR_M.top + PH + 10}
+                  transform={`rotate(-45 ${x + barW / 2} ${BAR_M.top + PH + 10})`}
                   textAnchor="end"
                   fontSize={7}
                   fill={LABEL}
