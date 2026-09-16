@@ -32,6 +32,13 @@ import {
 } from '../lib/utils/survival'
 import type { DateLog, Experiment, Folder } from '../types/database'
 
+function formatDayMonth(value: string) {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+  })
+}
+
 function BackLink() {
   return (
     <Link
@@ -408,8 +415,15 @@ export default function FolderDetailPage() {
                   />
                 )}
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium text-on-surface">
-                    {exp.title}
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="block truncate font-medium text-on-surface">
+                      {exp.title}
+                    </span>
+                    {summaryFor(exp.id)?.lastLogDate && (
+                      <span className="shrink-0 text-xs text-on-surface-variant">
+                        {formatDayMonth(summaryFor(exp.id)!.lastLogDate!)}
+                      </span>
+                    )}
                   </span>
                   <span className="block truncate text-sm text-on-surface-variant">
                     <span

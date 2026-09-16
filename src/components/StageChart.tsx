@@ -13,20 +13,24 @@ const M = { top: 10, right: 10, bottom: 44, left: 28 }
 const PW = VW - M.left - M.right
 const PH = VH - M.top - M.bottom
 
-// Darker = further along the track. Leaf track is the green spectrum.
+// Darker = further along the track. Grey means "no progress yet" in both
+// tracks; the leaf track then steps through a wide, high-contrast green ramp
+// so adjacent stages stay easy to tell apart at a glance.
 const ROOT_FILL = ['#cfd8dc', '#26a69a', '#00695c']
-const SHOOT_FILL = ['#c8e6c9', '#81c784', '#43a047', '#1b5e20']
+const SHOOT_FILL = ['#cfd8dc', '#a5d6a7', '#4caf50', '#1b5e20']
 
 function StackedBars({
   trend,
   fills,
   codes,
+  labels,
   title,
   pick,
 }: {
   trend: ReturnType<typeof stageTrend>
   fills: string[]
   codes: string[]
+  labels: string[]
   title: string
   pick: (p: ReturnType<typeof stageTrend>[number]) => number[]
 }) {
@@ -126,7 +130,8 @@ function StackedBars({
               className="size-2 shrink-0 rounded-full"
               style={{ backgroundColor: fills[i] }}
             />
-            {code}
+            <span className="font-medium text-on-surface">{code}</span>
+            {labels[i]}
           </li>
         ))}
       </ul>
@@ -228,6 +233,7 @@ export default function StageChart({ logs }: Props) {
         trend={trend}
         fills={ROOT_FILL}
         codes={ROOT_STAGES.map((s) => s.code)}
+        labels={ROOT_STAGES.map((s) => s.label)}
         title="Root track"
         pick={(p) => p.root}
       />
@@ -235,6 +241,7 @@ export default function StageChart({ logs }: Props) {
         trend={trend}
         fills={SHOOT_FILL}
         codes={SHOOT_STAGES.map((s) => s.code)}
+        labels={SHOOT_STAGES.map((s) => s.label)}
         title="Leaf track"
         pick={(p) => p.shoot}
       />

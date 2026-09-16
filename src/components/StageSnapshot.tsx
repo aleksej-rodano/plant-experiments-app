@@ -80,6 +80,9 @@ export default function StageSnapshot({ logs, startedCount }: Props) {
             counts={entry.root}
             percents={rootPct}
           />
+          <p className="mt-1 text-[11px] text-on-surface-variant">
+            {ROOT_STAGES.map((s) => `${s.code} ${s.label}`).join(' · ')}
+          </p>
         </div>
         <div>
           <div className="mb-1 text-xs text-on-surface-variant">Leaf track</div>
@@ -88,6 +91,9 @@ export default function StageSnapshot({ logs, startedCount }: Props) {
             counts={entry.shoot}
             percents={shootPct}
           />
+          <p className="mt-1 text-[11px] text-on-surface-variant">
+            {SHOOT_STAGES.map((s) => `${s.code} ${s.label}`).join(' · ')}
+          </p>
         </div>
       </div>
     </section>
