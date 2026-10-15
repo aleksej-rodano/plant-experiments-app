@@ -1,12 +1,21 @@
 import { Droplets, FlaskConical, Loader2 } from 'lucide-react'
 
+type Kind = 'watered' | 'fertilized'
+
 interface Props {
   /** Log a today-dated entry with the matching flag set. */
-  onLog: (kind: 'watered' | 'fertilized') => void
+  onLog: (kind: Kind) => void
   /** Disable while a save is in flight. */
   busy: boolean
   /** Which button, if any, is currently saving — shows a spinner on it. */
-  pending?: 'watered' | 'fertilized' | null
+  pending?: Kind | null
+  /** Which buttons to show; both by default. */
+  kinds?: Kind[]
+}
+
+const BUTTONS: Record<Kind, { label: string; Icon: typeof Droplets }> = {
+  watered: { label: 'Plant watered', Icon: Droplets },
+  fertilized: { label: 'Fertilized', Icon: FlaskConical },
 }
 
 /**
@@ -15,39 +24,39 @@ interface Props {
  * timeline — for the common case of just recording that a plant was watered
  * or fertilized.
  */
-export default function QuickCareButtons({ onLog, busy, pending }: Props) {
+export default function QuickCareButtons({
+  onLog,
+  busy,
+  pending,
+  kinds = ['watered', 'fertilized'],
+}: Props) {
   return (
     <fieldset className="flex flex-col gap-2 rounded-lg border border-outline-variant p-3">
       <legend className="px-1 text-sm text-on-surface-variant">
         Quick log — dated today, nothing else needed
       </legend>
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onLog('watered')}
-          className="flex items-center justify-center gap-2 rounded-lg bg-secondary-container px-4 py-3 text-sm font-medium text-on-secondary-container hover:opacity-90 disabled:opacity-60"
-        >
-          {pending === 'watered' ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <Droplets className="size-4" />
-          )}
-          Plant watered
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => onLog('fertilized')}
-          className="flex items-center justify-center gap-2 rounded-lg bg-secondary-container px-4 py-3 text-sm font-medium text-on-secondary-container hover:opacity-90 disabled:opacity-60"
-        >
-          {pending === 'fertilized' ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <FlaskConical className="size-4" />
-          )}
-          Fertilized
-        </button>
+      <div
+        className={`grid gap-2 ${kinds.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
+      >
+        {kinds.map((kind) => {
+          const { label, Icon } = BUTTONS[kind]
+          return (
+            <button
+              key={kind}
+              type="button"
+              disabled={busy}
+              onClick={() => onLog(kind)}
+              className="flex items-center justify-center gap-2 rounded-lg bg-secondary-container px-4 py-3 text-sm font-medium text-on-secondary-container hover:opacity-90 disabled:opacity-60"
+            >
+              {pending === kind ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Icon className="size-4" />
+              )}
+              {label}
+            </button>
+          )
+        })}
       </div>
     </fieldset>
   )

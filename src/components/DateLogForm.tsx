@@ -288,10 +288,13 @@ export default function DateLogForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {mode === 'add' && (
+        // Watering is logged folder-wide (it's the same for the whole batch);
+        // fertilizer can differ per treatment, so it stays here.
         <QuickCareButtons
           onLog={(kind) => void quickLog(kind)}
           busy={busy}
           pending={quickPending}
+          kinds={['fertilized']}
         />
       )}
 
