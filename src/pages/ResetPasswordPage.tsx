@@ -1,6 +1,7 @@
 import { Loader2, Sprout } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../lib/hooks/useAuth'
 
 const inputClass =
@@ -74,8 +75,7 @@ export default function ResetPasswordPage() {
           <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
               New password
-              <input
-                type="password"
+              <PasswordInput
                 required
                 minLength={6}
                 autoComplete="new-password"
@@ -87,8 +87,7 @@ export default function ResetPasswordPage() {
 
             <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
               Confirm new password
-              <input
-                type="password"
+              <PasswordInput
                 required
                 minLength={6}
                 autoComplete="new-password"

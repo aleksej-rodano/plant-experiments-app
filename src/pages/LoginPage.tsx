@@ -1,5 +1,6 @@
-import { Eye, EyeOff, Loader2, Sprout } from 'lucide-react'
+import { Loader2, Sprout } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import PasswordInput from '../components/PasswordInput'
 import { useAuth } from '../lib/hooks/useAuth'
 
 type Mode = 'signin' | 'signup' | 'reset'
@@ -12,7 +13,6 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -91,32 +91,16 @@ export default function LoginPage() {
           {mode !== 'reset' && (
             <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
               Password
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  minLength={6}
-                  autoComplete={
-                    mode === 'signin' ? 'current-password' : 'new-password'
-                  }
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`${inputClass} w-full pr-11`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  aria-pressed={showPassword}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-on-surface-variant hover:text-on-surface"
-                >
-                  {showPassword ? (
-                    <EyeOff className="size-5" />
-                  ) : (
-                    <Eye className="size-5" />
-                  )}
-                </button>
-              </div>
+              <PasswordInput
+                required
+                minLength={6}
+                autoComplete={
+                  mode === 'signin' ? 'current-password' : 'new-password'
+                }
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={inputClass}
+              />
             </label>
           )}
 
