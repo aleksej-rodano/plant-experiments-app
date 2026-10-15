@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { CARE_TILE_CLASS, careStatus, type CareSchedule } from '../lib/utils/care'
 
 interface Props {
-  /** The folder or experiment whose recurring chore this shows. */
+  /** The folder whose recurring chore this shows. */
   schedule: CareSchedule
   /** Route to the form that edits this schedule. */
   editHref: string
@@ -15,7 +15,7 @@ interface Props {
 }
 
 /**
- * The recurring-chore status for a folder or experiment — what's due, when, and
+ * The recurring-chore status for a folder — what's due, when, and
  * a one-tap way to reset the clock. Falls back to a quiet prompt when nothing is
  * scheduled yet.
  */

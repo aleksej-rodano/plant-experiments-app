@@ -75,7 +75,7 @@ export async function binFolder(folderId: string): Promise<void> {
     .update(stampFields(batch, at, true))
     .eq('id', folderId)
   if (error) throw error
-  // A binned folder's reminders (and its experiments') must stop firing.
+  // A binned folder's reminder must stop firing.
   void syncCareNotifications()
 }
 
@@ -96,7 +96,6 @@ export async function binExperiment(experimentId: string): Promise<void> {
     .update(stampFields(batch, at, true))
     .eq('id', experimentId)
   if (error) throw error
-  void syncCareNotifications()
 }
 
 /** Move a single row with no children (a log entry or a note) to the bin. */

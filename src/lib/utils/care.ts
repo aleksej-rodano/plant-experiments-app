@@ -11,8 +11,8 @@ export function isoDay(d: Date) {
 export const today = () => isoDay(new Date())
 
 /**
- * The three columns that describe a recurring chore. Both `folders` and
- * `experiments` carry this shape, so `careStatus` works on either.
+ * The three folder columns that describe a recurring chore. (`experiments`
+ * still has the same columns in the database, but they're no longer used.)
  */
 export interface CareSchedule {
   care_task_label: string | null
@@ -39,8 +39,8 @@ function addDays(iso: string, days: number) {
 }
 
 /**
- * Where a recurring chore stands right now, for a folder or an experiment. Null
- * when no schedule is set up.
+ * Where a recurring chore stands right now, for a folder. Null when no
+ * schedule is set up.
  */
 export function careStatus(row: CareSchedule): CareStatus | null {
   const interval = row.care_interval_days

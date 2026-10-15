@@ -6,7 +6,7 @@ import { supabase } from '../supabase'
 import { careStatus, type CareSchedule } from '../utils/care'
 
 // We schedule a notification per day for the next three weeks; each one lists
-// every folder / experiment chore that is due or overdue on that day. Because
+// every folder chore that is due or overdue on that day. Because
 // the whole set is rebuilt every time the app opens (and after any care edit),
 // an untouched overdue task keeps reappearing each morning until it's marked
 // done. IDs live in a fixed band we can safely clear and rewrite.
@@ -29,13 +29,12 @@ interface Task {
 }
 
 async function collectTasks(): Promise<Task[]> {
-  const cols = 'title, care_task_label, care_interval_days, care_last_done_on'
-  const [folders, experiments] = await Promise.all([
-    supabase.from('folders').select(cols).is('deleted_at', null),
-    supabase.from('experiments').select(cols).is('deleted_at', null),
-  ])
-  const rows = [...(folders.data ?? []), ...(experiments.data ?? [])]
-  return rows
+  // Reminders are folder-wide only; experiments no longer carry their own.
+  const { data } = await supabase
+    .from('folders')
+    .select('title, care_task_label, care_interval_days, care_last_done_on')
+    .is('deleted_at', null)
+  return (data ?? [])
     .filter((r) => (r.care_interval_days ?? 0) > 0)
     .map((r) => ({ name: r.title, schedule: r as CareSchedule }))
 }
