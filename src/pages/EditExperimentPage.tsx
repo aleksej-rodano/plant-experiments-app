@@ -6,6 +6,7 @@ import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
 import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
+import { today } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type {
   Database,
@@ -15,8 +16,6 @@ import type {
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 const STATUS_OPTIONS: { value: ExperimentStatus; label: string }[] = [
   { value: 'ongoing', label: 'Ongoing' },

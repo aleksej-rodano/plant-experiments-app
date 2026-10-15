@@ -4,10 +4,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import PhotoAnnotator from '../components/PhotoAnnotator'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { today } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Experiment, Folder } from '../types/database'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 /**
  * The fast path for the common case: a photo *is* the update. Shoot, save, done —

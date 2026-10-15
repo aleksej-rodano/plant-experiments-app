@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import CoverImagePicker from '../components/CoverImagePicker'
 import { useAuth } from '../lib/hooks/useAuth'
+import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
 import { CARE_TASK_SUGGESTIONS } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
@@ -146,6 +147,7 @@ export default function EditFolderPage() {
         .update(payload)
         .eq('id', folderId)
       if (error) throw error
+      void syncCareNotifications()
       navigate(backTo, {
         replace: true,
         state: { toast: 'Folder updated.' },

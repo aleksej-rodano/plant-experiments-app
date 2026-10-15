@@ -15,6 +15,9 @@ const DAYS_AHEAD = 21
 const ID_BASE = 47_000
 
 let resumeListenerBound = false
+// Syncs run one after another: two overlapping runs could each cancel, then the
+// one holding older data could schedule last and leave stale days behind.
+let syncChain: Promise<void> = Promise.resolve()
 
 function isAndroid() {
   return Capacitor.getPlatform() === 'android'
@@ -49,8 +52,13 @@ function atHour(offsetDays: number): Date {
  * anything but the Android app; safe to call as often as you like (fire and
  * forget — failures are swallowed so it never breaks a save).
  */
-export async function syncCareNotifications(): Promise<void> {
-  if (!isAndroid()) return
+export function syncCareNotifications(): Promise<void> {
+  if (!isAndroid()) return Promise.resolve()
+  syncChain = syncChain.then(rebuild)
+  return syncChain
+}
+
+async function rebuild(): Promise<void> {
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications')
 

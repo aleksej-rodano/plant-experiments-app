@@ -5,6 +5,7 @@ import PhotoAnnotator from './PhotoAnnotator'
 import QuickCareButtons from './QuickCareButtons'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { today } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import {
   ROOT_STAGES,
@@ -17,8 +18,6 @@ import type { DateLog } from '../types/database'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 interface Props {
   experimentId: string
@@ -111,8 +110,12 @@ export default function DateLogForm({
       leafing_without_rooting: leafingNoRoot.trim() ? Number(leafingNoRoot) : 0,
     } as unknown as DateLog
     const entry = stageEntry(draft)
-    return entry ? stageWarnings(entry, plantCount) : []
-  }, [stagesTouched, stages, deaths, leafingNoRoot, plantCount])
+    // Buckets count the plants alive now, so reconcile them against every
+    // death logged so far, not just this entry's.
+    return entry
+      ? stageWarnings({ ...entry, dead: entry.dead + priorDeaths }, plantCount)
+      : []
+  }, [stagesTouched, stages, deaths, leafingNoRoot, plantCount, priorDeaths])
 
   useEffect(() => {
     if (!image) {

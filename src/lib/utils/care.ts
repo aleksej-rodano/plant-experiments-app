@@ -1,6 +1,14 @@
 import { daysBetween } from './insights'
 
-export const today = () => new Date().toISOString().slice(0, 10)
+const pad = (n: number) => String(n).padStart(2, '0')
+
+/** Local `yyyy-mm-dd` for a date. toISOString() would give the UTC day instead. */
+export function isoDay(d: Date) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** Today's date in the user's timezone, as `yyyy-mm-dd`. */
+export const today = () => isoDay(new Date())
 
 /**
  * The three columns that describe a recurring chore. Both `folders` and
@@ -27,9 +35,7 @@ export interface CareStatus {
 function addDays(iso: string, days: number) {
   const d = new Date(`${iso}T00:00:00`)
   d.setDate(d.getDate() + days)
-  // Format from local parts: toISOString() would shift the date across timezones.
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  return isoDay(d)
 }
 
 /**

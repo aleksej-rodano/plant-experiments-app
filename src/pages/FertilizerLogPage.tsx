@@ -2,12 +2,11 @@ import { Droplets, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useAuth } from '../lib/hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { today } from '../lib/utils/care'
 import type { FeedingLog } from '../types/database'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 function formatDate(value: string) {
   return new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {

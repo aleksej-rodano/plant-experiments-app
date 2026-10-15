@@ -6,13 +6,12 @@ import QuickCareButtons from './QuickCareButtons'
 import { useAuth } from '../lib/hooks/useAuth'
 import { syncCareNotifications } from '../lib/native'
 import { supabase } from '../lib/supabase'
+import { today } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import type { Experiment } from '../types/database'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
-
-const today = () => new Date().toISOString().slice(0, 10)
 
 interface Props {
   /** Experiments the entry will be written to (one date_logs row each). */
@@ -180,12 +179,14 @@ export default function FolderDateLogForm({
       if (error) throw error
 
       // Doing the whole folder at once is exactly the chore the reminder tracks,
-      // so reset its clock. A failure here shouldn't lose the entry that saved.
+      // so reset its clock — but never backwards: a backdated entry mustn't
+      // undo a more recent "done". A failure here shouldn't lose the entry.
       if (folderId) {
         await supabase
           .from('folders')
           .update({ care_last_done_on: logDate })
           .eq('id', folderId)
+          .or(`care_last_done_on.is.null,care_last_done_on.lt.${logDate}`)
         void syncCareNotifications()
       }
 

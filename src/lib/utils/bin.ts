@@ -1,4 +1,5 @@
 import type { DateLog, Experiment, Folder, Note } from '../../types/database'
+import { syncCareNotifications } from '../native'
 import { supabase } from '../supabase'
 import { removeStoredImages } from './image'
 
@@ -74,6 +75,8 @@ export async function binFolder(folderId: string): Promise<void> {
     .update(stampFields(batch, at, true))
     .eq('id', folderId)
   if (error) throw error
+  // A binned folder's reminders (and its experiments') must stop firing.
+  void syncCareNotifications()
 }
 
 /** Move an experiment and its log entries to the bin. */
@@ -93,6 +96,7 @@ export async function binExperiment(experimentId: string): Promise<void> {
     .update(stampFields(batch, at, true))
     .eq('id', experimentId)
   if (error) throw error
+  void syncCareNotifications()
 }
 
 /** Move a single row with no children (a log entry or a note) to the bin. */
@@ -122,6 +126,7 @@ export async function restoreBatch(batchId: string): Promise<void> {
     if (error) throw error
   }
   await reviveAncestors(batchId)
+  void syncCareNotifications()
 }
 
 /**
