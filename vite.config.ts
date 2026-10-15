@@ -44,6 +44,9 @@ export default defineConfig({
         // cached: data is always fetched live.
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
         navigateFallback: '/index.html',
+        // Server functions (e.g. /api/keep-alive) must reach Vercel, not get
+        // answered with the app shell.
+        navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
