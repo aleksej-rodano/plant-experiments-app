@@ -342,7 +342,7 @@ function MultiChart({
 /**
  * Rooted / Shoots / Established, all on one chart — same color per experiment
  * as the survival chart, distinguished by line style, with checkboxes to
- * toggle each stage on or off.
+ * toggle each stage and each experiment on or off.
  */
 function StageComparisonChart({ experiments, logs }: Props) {
   const [enabled, setEnabled] = useState<Record<StageKey, boolean>>({
@@ -350,6 +350,16 @@ function StageComparisonChart({ experiments, logs }: Props) {
     shoots: true,
     established: true,
   })
+  // Hidden rather than shown, so experiments added later start ticked.
+  const [hiddenExps, setHiddenExps] = useState<Set<string>>(() => new Set())
+
+  const toggleExp = (id: string) =>
+    setHiddenExps((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const byExp = new Map<string, DateLog[]>()
   for (const log of logs) {
@@ -360,6 +370,9 @@ function StageComparisonChart({ experiments, logs }: Props) {
 
   const series: Series[] = []
   experiments.forEach((exp, i) => {
+    // Colour stays tied to the experiment's index, so hiding one doesn't
+    // repaint the rest.
+    if (hiddenExps.has(exp.id)) return
     const pct = stagePctSeries(byExp.get(exp.id) ?? [], exp.plant_count ?? null)
     const byStage: Record<StageKey, Point[]> = {
       rooted: pct.rooted,
@@ -381,20 +394,43 @@ function StageComparisonChart({ experiments, logs }: Props) {
 
   return (
     <div className="min-w-0 sm:col-span-2">
-      <div className="mb-2 flex flex-wrap gap-3 rounded-lg bg-surface-container p-3 text-xs text-on-surface-variant">
-        {STAGE_META.map(({ key, label }) => (
-          <label key={key} className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={enabled[key]}
-              onChange={() =>
-                setEnabled((prev) => ({ ...prev, [key]: !prev[key] }))
-              }
-            />
-            {label}
-          </label>
-        ))}
-        {!hasData && <span>Nothing to show — tick at least one stage.</span>}
+      <div className="mb-2 flex flex-col gap-2 rounded-lg bg-surface-container p-3 text-xs text-on-surface-variant">
+        <div className="flex flex-wrap gap-3">
+          {STAGE_META.map(({ key, label }) => (
+            <label key={key} className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={enabled[key]}
+                onChange={() =>
+                  setEnabled((prev) => ({ ...prev, [key]: !prev[key] }))
+                }
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-3 border-t border-outline-variant pt-2">
+          {experiments.map((exp, i) => (
+            <label key={exp.id} className="flex min-w-0 items-center gap-1.5">
+              <input
+                type="checkbox"
+                checked={!hiddenExps.has(exp.id)}
+                onChange={() => toggleExp(exp.id)}
+              />
+              <span
+                aria-hidden
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: seriesColor(i) }}
+              />
+              <span className="max-w-32 truncate">{exp.title}</span>
+            </label>
+          ))}
+        </div>
+        {!hasData && (
+          <span>
+            Nothing to show — tick at least one stage and one experiment.
+          </span>
+        )}
       </div>
       {hasData && (
         <MultiChart
