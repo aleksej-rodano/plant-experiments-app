@@ -210,6 +210,24 @@ Working today:
   potting as a row ("Potted 4 plants into 2 pots"). Pot deaths count in the
   experiment's survival (`deaths_count` as before). The care schedule is
   unchanged. Helpers: `src/lib/utils/potLogs.ts`.
+- **Two phases on the experiment page (Stage 6).** Once an experiment has a
+  potting, its header adds "In propagation X · Potted Y · Died Z" (`phase1Spare` ·
+  `phase2Alive` · every death, so the three add up to the plant count) and the
+  page splits into two tabs, **Phase 1 — Propagation** and **Phase 2 — Potted**
+  (the second only exists with a potting; the last tab per experiment is kept in
+  component state only). Phase 1 holds the latest-check-in snapshot, the stage
+  charts and the timeline filtered to Phase 1 (potting rows stay in it). Phase 2
+  holds an alive-in-pots / potted-share line, the **Health in pots** chart, the
+  pot list (`PottingsSection`: photo, label, alive / in pot, size, substrate, last
+  check-in and the per-pot buttons, plus **Delete potting**) and a pot timeline
+  with **All pots / <pot>** filter buttons. `StageChart` takes the Phase 1 logs
+  (stage counts are already the plants still in Phase 1, so the bars shrink after
+  a potting) and draws a dashed line + "Potted <date>" label in the gap before the
+  first check-in on or after each potting date. `PotHealthChart` (inline SVG, from
+  `phase2Trend` in `src/lib/utils/phase2Trend.ts`) stacks good / ok / poor per
+  Phase 2 check-in date — each pot's latest health count up to that date — with
+  an "Alive in pots" line. `DateLogTimeline` got `phase`, `potId` and `emptyText`
+  props for the filtering.
 - **Phase 2 (potting) — schema.** The database now has `pottings`
   (a potting event on a date) and `pots` (individual pots, each with its own
   plant count and photo), plus `phase` / `pot_id` / `health_good|ok|poor` on
