@@ -7,11 +7,13 @@ import {
   Pencil,
   Plus,
   Sheet,
+  Sprout,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DateLogTimeline from '../components/DateLogTimeline'
+import PottingsSection from '../components/PottingsSection'
 import StageChart from '../components/StageChart'
 import StageSnapshot from '../components/StageSnapshot'
 import { isNativeApp } from '../lib/native'
@@ -93,7 +95,10 @@ export default function ExperimentDetailPage() {
   }, [])
 
   // Pottings / pots feed the Phase 1 population behind the stage percentages.
-  const { pottings, pots } = usePottings(id ? [id] : [])
+  // `phaseRefresh` is bumped after a potting is deleted so the Phase 1 numbers
+  // (snapshot, pottings list) and the timeline reload.
+  const [phaseRefresh, setPhaseRefresh] = useState(0)
+  const { pottings, pots } = usePottings(id ? [id] : [], phaseRefresh)
   const phaseInput = useMemo<PhaseInput>(
     () => ({
       experiment: { plant_count: experiment?.plant_count ?? null },
@@ -373,6 +378,15 @@ export default function ExperimentDetailPage() {
             </>
           )}
           <Link
+            to={`/experiments/${experiment.id}/pot`}
+            state={{ experiment }}
+            title="Move plants from propagation into pots"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+          >
+            <Sprout className="size-4" />
+            <span>Pot plants</span>
+          </Link>
+          <Link
             to={`/experiments/${experiment.id}/logs/new`}
             state={{ experiment, folder }}
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90"
@@ -410,8 +424,21 @@ export default function ExperimentDetailPage() {
         </div>
       )}
 
+      <PottingsSection
+        experimentId={experiment.id}
+        pottings={pottings}
+        pots={pots}
+        phaseInput={phaseInput}
+        onDeleted={() => {
+          setPhaseRefresh((n) => n + 1)
+          setToast('Potting moved to the bin.')
+          setTimeout(() => setToast(null), 3000)
+        }}
+      />
+
       <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">Timeline</h2>
       <DateLogTimeline
+        key={phaseRefresh}
         experimentId={experiment.id}
         experiment={experiment}
         folder={folder}

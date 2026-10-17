@@ -95,10 +95,10 @@ export default function CoverImagePicker({
             <button
               type="button"
               onClick={handleClear}
-              aria-label={`Remove ${label.toLowerCase()}`}
-              className="rounded-lg bg-surface/80 p-1.5 text-on-surface-variant backdrop-blur hover:bg-surface hover:text-error"
+              className="flex items-center gap-1 rounded-lg bg-surface/80 px-2 py-1.5 text-xs font-medium text-on-surface-variant backdrop-blur hover:bg-surface hover:text-error"
             >
-              <X className="size-4" />
+              <X className="size-3.5" />
+              Remove
             </button>
           </div>
         </div>

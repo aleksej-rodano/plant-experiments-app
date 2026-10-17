@@ -12,6 +12,7 @@ import CreateFolderPage from './pages/CreateFolderPage'
 import EditDateLogPage from './pages/EditDateLogPage'
 import EditExperimentPage from './pages/EditExperimentPage'
 import EditFolderPage from './pages/EditFolderPage'
+import EditPotPage from './pages/EditPotPage'
 import ExperimentDetailPage from './pages/ExperimentDetailPage'
 import FertilizerLogPage from './pages/FertilizerLogPage'
 import FolderDetailPage from './pages/FolderDetailPage'
@@ -19,6 +20,7 @@ import FoldersPage from './pages/FoldersPage'
 import LoginPage from './pages/LoginPage'
 import NotesPage from './pages/NotesPage'
 import PestControlPage from './pages/PestControlPage'
+import PotPlantsPage from './pages/PotPlantsPage'
 import QuickPhotoLogPage from './pages/QuickPhotoLogPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
@@ -98,6 +100,11 @@ function App() {
             <Route
               path="/experiments/:id/edit"
               element={<EditExperimentPage />}
+            />
+            <Route path="/experiments/:id/pot" element={<PotPlantsPage />} />
+            <Route
+              path="/experiments/:id/pots/:potId/edit"
+              element={<EditPotPage />}
             />
             <Route
               path="/experiments/:id/logs/new"

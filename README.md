@@ -173,13 +173,32 @@ Working today:
 - **Bin** — deleting anything moves it to a bin you can restore from for 30 days,
   after which it and its photos are removed permanently
 - Fertilizer log, pest reference, tips, and notes
-- **Phase 2 (potting) — schema only, no UI yet.** The database now has `pottings`
+- **Potting an experiment (Phase 2, Stage 4).** The experiment page has a
+  **Pot plants** button → `/experiments/:id/pot`: a date, optional notes and a
+  list of pots (label, plants, size, substrate, notes, photo — camera or gallery),
+  with **Add another pot** / **Remove pot** / **Save potting**. "Plants available
+  to pot" is `phase1Spare` (not the Phase 1 count on the chosen date, so a
+  backdated potting leaves room for later pottings and deaths); the save is
+  blocked above it, and the "up to X may be ready (R2: a, S3: b)" hint is display
+  only. Photos upload first, then `create_potting` runs once; if it fails the
+  message is shown, the form stays and the uploaded photos are deleted. The pot
+  list is its own controlled component, `src/components/PotRowsEditor.tsx`
+  (`rows`, `onChange`, `available`, `showErrors`, `disabled`, `firstNumber`),
+  with `validatePotRows` / `savePotting` in `src/lib/utils/potting.ts`, so the
+  folder-level wizard can reuse it. A **Pottings** section on the experiment page
+  (only once a potting exists) lists each potting and its pots (alive / in pot,
+  size, substrate) with **Edit pot** (`/experiments/:id/pots/:potId/edit`: label,
+  size, substrate, notes, photo, plants — never below the deaths already logged
+  for the pot, never above its count plus the plants left in Phase 1) and
+  **Delete potting** (confirms how many plants return to Phase 1 and how many pot
+  check-ins go to the bin with it).
+- **Phase 2 (potting) — schema.** The database now has `pottings`
   (a potting event on a date) and `pots` (individual pots, each with its own
   plant count and photo), plus `phase` / `pot_id` / `health_good|ok|poor` on
   check-ins and an atomic `create_potting` RPC that refuses to pot more plants
   than Phase 1 still holds. Pottings and pots already go through the bin
   (delete/restore/purge, pot photos included) and are included in the JSON
-  backup. The screens come in the next stages — see `PHASE2_PLAN.md`.
+  backup. Phase 2 check-ins and the folder-level potting come in later stages — see `PHASE2_PLAN.md`.
 - **Plant accounting for the two phases** lives in one place,
   `src/lib/utils/phases.ts`: `phase1Cohort(asOf)` (plants still part of Phase 1
   on a date — the denominator of stage percentages and warnings, which for an
