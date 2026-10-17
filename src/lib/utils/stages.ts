@@ -40,8 +40,30 @@ export interface StageEntry {
   shootTotal: number
 }
 
-/** Null when this check-in recorded no stage counts at all. */
+/**
+ * Population that stage percentages and warnings divide by: a fixed number, or a
+ * function of the check-in date (`phase1Cohort` from phases.ts, so potted-out
+ * plants leave the denominator from their potting date on). Null = no denominator.
+ */
+export type StageDenominator =
+  | number
+  | null
+  | ((asOf: string) => number | null)
+
+function resolveDenominator(
+  denominator: StageDenominator,
+  asOf: string,
+): number | null {
+  const n = typeof denominator === 'function' ? denominator(asOf) : denominator
+  return n && n > 0 ? n : null
+}
+
+/**
+ * Null when this check-in recorded no stage counts at all. Stage counts are a
+ * Phase 1 concept: a Phase 2 (potted) log never carries a stage entry.
+ */
 export function stageEntry(log: DateLog): StageEntry | null {
+  if (log.phase === 'potted') return null
   const hasRoot = ROOT_KEYS.some((k) => log[k] != null)
   const hasShoot = SHOOT_KEYS.some((k) => log[k] != null)
   if (!hasRoot && !hasShoot) return null
@@ -85,7 +107,7 @@ export function latestStageLog(logs: DateLog[]): DateLog | null {
 export interface StageSnapshot {
   log: DateLog
   entry: StageEntry
-  /** Plants the experiment started with — the % denominator, or null if unset. */
+  /** Phase 1 population at this check-in — the % denominator, or null if unset. */
   started: number | null
   /** % of the started total in each root bucket, or null without a denominator. */
   rootPct: [number, number, number] | null
@@ -100,14 +122,19 @@ export interface StageSnapshot {
   pctLeafingWithoutRooting: number | null
 }
 
+/**
+ * Latest Phase 1 stage snapshot. `population` is the Phase 1 population as of
+ * that check-in: pass `(asOf) => phase1Cohort(input, asOf)` (phases.ts), or a
+ * plain number / null when there are no pottings to account for.
+ */
 export function stageSnapshot(
   logs: DateLog[],
-  startedCount: number | null,
+  population: StageDenominator,
 ): StageSnapshot | null {
   const log = latestStageLog(logs)
   if (!log) return null
   const entry = stageEntry(log)!
-  const d = startedCount && startedCount > 0 ? startedCount : null
+  const d = resolveDenominator(population, log.log_date)
   const pct = (n: number) => (d == null ? null : (n / d) * 100)
   const pctArr = <T extends number[]>(arr: T) =>
     d == null ? null : (arr.map((n) => (n / d) * 100) as unknown as T)
@@ -172,7 +199,9 @@ export function stageDelta(logs: DateLog[]): StageDelta | null {
   const deathsSincePrevious = logs
     .filter(
       (l) =>
-        dayMs(l.log_date) > lowerBound && dayMs(l.log_date) <= dayMs(log.log_date),
+        l.phase !== 'potted' &&
+        dayMs(l.log_date) > lowerBound &&
+        dayMs(l.log_date) <= dayMs(log.log_date),
     )
     .reduce((sum, l) => sum + (l.deaths_count ?? 0), 0)
 
@@ -196,25 +225,27 @@ export function stageDelta(logs: DateLog[]): StageDelta | null {
 /**
  * Soft reconciliation checks — every message is a nudge to double-check entry,
  * never a reason to block saving. Lag between counting the two tracks is normal.
+ * `population` is the Phase 1 population as of the check-in (`phase1Cohort`);
+ * `entry.dead` must be the Phase 1 deaths up to and including that check-in.
  */
 export function stageWarnings(
   entry: StageEntry,
-  startedCount: number | null,
+  population: number | null,
 ): string[] {
   const out: string[] = []
-  const started = startedCount ?? null
+  const started = population ?? null
 
   if (started != null) {
     const rootSum = entry.rootTotal + entry.dead
     if (rootSum !== started) {
       out.push(
-        `Root buckets + dead = ${rootSum}, but the experiment started with ${started}.`,
+        `Root buckets + dead = ${rootSum}, but Phase 1 had ${started} plants.`,
       )
     }
     const shootSum = entry.shootTotal + entry.dead
     if (shootSum !== started) {
       out.push(
-        `Shoot buckets + dead = ${shootSum}, but the experiment started with ${started}.`,
+        `Shoot buckets + dead = ${shootSum}, but Phase 1 had ${started} plants.`,
       )
     }
   }
@@ -288,20 +319,22 @@ function round3sf(n: number): number {
 /**
  * % rooted / % any-shoot / % established at each check-in, oldest first — the
  * input to the per-stage comparison charts. Empty without a plant count to
- * divide by. One point per date: a later entry on the same day supersedes the
- * earlier, same tie-break as `latestStageLog`.
+ * divide by; the denominator is looked up per check-in date. One point per
+ * date: a later entry on the same day supersedes the earlier, same tie-break as
+ * `latestStageLog`.
  */
 export function stagePctSeries(
   logs: DateLog[],
-  startedCount: number | null,
+  population: StageDenominator,
 ): {
   rooted: StagePctPoint[]
   anyShoot: StagePctPoint[]
   established: StagePctPoint[]
 } {
   const empty = { rooted: [], anyShoot: [], established: [] }
-  const d = startedCount && startedCount > 0 ? startedCount : null
-  if (d == null) return empty
+  if (typeof population !== 'function' && !(population && population > 0)) {
+    return empty
+  }
 
   const withStages = logs
     .map((log) => ({ log, entry: stageEntry(log) }))
@@ -325,6 +358,8 @@ export function stagePctSeries(
     else arr.push({ t, value })
   }
   for (const { log, entry } of withStages) {
+    const d = resolveDenominator(population, log.log_date)
+    if (d == null) continue
     const t = dayMs(log.log_date)
     push(rooted, t, round3sf(((entry.root[1] + entry.root[2]) / d) * 100))
     push(

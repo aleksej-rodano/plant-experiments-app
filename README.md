@@ -180,6 +180,19 @@ Working today:
   than Phase 1 still holds. Pottings and pots already go through the bin
   (delete/restore/purge, pot photos included) and are included in the JSON
   backup. The screens come in the next stages — see `PHASE2_PLAN.md`.
+- **Plant accounting for the two phases** lives in one place,
+  `src/lib/utils/phases.ts`: `phase1Cohort(asOf)` (plants still part of Phase 1
+  on a date — the denominator of stage percentages and warnings, which for an
+  experiment without pottings is simply the plant count), `phase1Remaining(asOf)`
+  (cohort minus Phase 1 deaths), `phase1Spare()` (plants that can still leave
+  Phase 1 at all — the cap for "plants available to pot" and for Phase 1 deaths,
+  so a backdated entry always leaves room for later ones), `potAlive`,
+  `phase2Alive`, `totalAlive`, `pottedShare` and the "up to X may be ready"
+  hint `readyToPot` (min of R2 and S3). Stage snapshots, comparison tables,
+  warnings and the log form's death cap use them; phase 2 (potted) check-ins
+  are ignored by the root/leaf stage views. Survival keeps its formula (plant
+  count minus every death), and the folder summary now also carries the potted
+  share and plants alive in pots (informational, not used for the winner).
 
 Photos are automatically shrunk before upload so saving stays fast.
 

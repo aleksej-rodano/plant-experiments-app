@@ -1,10 +1,17 @@
-import { stageDelta, stageSnapshot } from '../lib/utils/stages'
+import {
+  stageDelta,
+  stageSnapshot,
+  type StageDenominator,
+} from '../lib/utils/stages'
 import type { DateLog } from '../types/database'
 
 interface Props {
   logs: DateLog[]
-  /** Plants the experiment started with — the percentage denominator. */
-  startedCount: number | null
+  /**
+   * Phase 1 population at a check-in — the percentage denominator: a number, or
+   * `(asOf) => phase1Cohort(input, asOf)` once the experiment has pottings.
+   */
+  population: StageDenominator
 }
 
 function formatLogDate(value: string) {
@@ -28,8 +35,8 @@ function fmtSigned(n: number) {
  * tracks, plus what changed since the previous check-in. The full history
  * is already in the chart below this, so this only calls out what's new.
  */
-export default function StageSnapshot({ logs, startedCount }: Props) {
-  const snap = stageSnapshot(logs, startedCount)
+export default function StageSnapshot({ logs, population }: Props) {
+  const snap = stageSnapshot(logs, population)
   const delta = stageDelta(logs)
   if (!snap || !delta) return null
 

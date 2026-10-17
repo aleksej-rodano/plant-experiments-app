@@ -8,6 +8,13 @@ import { supabase } from '../lib/supabase'
 import { today } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
 import {
+  phase1Cohort,
+  phase1Deaths,
+  phase1Spare,
+  pottedShare,
+  type PhaseInput,
+} from '../lib/utils/phases'
+import {
   ROOT_STAGES,
   SHOOT_STAGES,
   stageEntry,
@@ -24,10 +31,12 @@ interface Props {
   mode: 'add' | 'edit'
   /** The row being edited (edit mode only). */
   initial?: DateLog
-  /** Experiment's initial plant count — the reconciliation target + death cap. */
-  plantCount: number | null
-  /** Deaths logged in *other* entries — used to cap this entry's death count. */
-  priorDeaths: number
+  /**
+   * Plant accounting for this experiment: its plant count, pottings, pots and
+   * every live log (including the one being edited). Drives the death cap
+   * (`phase1Spare`) and the stage reconciliation warnings (`phase1Cohort`).
+   */
+  phaseInput: PhaseInput
   /** Where to go after a successful save / cancel. */
   backTo: string
   /** Extra router state to carry back (e.g. the experiment + folder). */
@@ -49,8 +58,7 @@ export default function DateLogForm({
   experimentId,
   mode,
   initial,
-  plantCount,
-  priorDeaths,
+  phaseInput,
   backTo,
   doneState,
   successToast,
@@ -92,9 +100,12 @@ export default function DateLogForm({
     'watered' | 'fertilized' | null
   >(null)
 
-  // How many plants may still be marked dead in this entry.
-  const aliveBefore =
-    plantCount == null ? null : Math.max(0, plantCount - priorDeaths)
+  // How many plants may still be marked dead in this entry: those that have not
+  // been potted or died in any other Phase 1 entry, whatever this entry's date
+  // (Phase 1 only shrinks, so a backdated death must leave room for later ones).
+  // Editing: this entry's own deaths are added back.
+  const aliveBefore = phase1Spare(phaseInput, { excludeLogId: initial?.id })
+  const hasPots = (pottedShare(phaseInput) ?? 0) > 0
 
   const stagesTouched =
     STAGE_KEYS.some((k) => stages[k].trim() !== '') || leafingNoRoot.trim() !== ''
@@ -110,12 +121,21 @@ export default function DateLogForm({
       leafing_without_rooting: leafingNoRoot.trim() ? Number(leafingNoRoot) : 0,
     } as unknown as DateLog
     const entry = stageEntry(draft)
-    // Buckets count the plants alive now, so reconcile them against every
-    // death logged so far, not just this entry's.
+    // Buckets count the plants alive at this check-in, so reconcile them against
+    // every Phase 1 death up to this date (not just this entry's), out of the
+    // plants still in Phase 1 on that date.
     return entry
-      ? stageWarnings({ ...entry, dead: entry.dead + priorDeaths }, plantCount)
+      ? stageWarnings(
+          {
+            ...entry,
+            dead:
+              entry.dead +
+              phase1Deaths(phaseInput, logDate, { excludeLogId: initial?.id }),
+          },
+          phase1Cohort(phaseInput, logDate),
+        )
       : []
-  }, [stagesTouched, stages, deaths, leafingNoRoot, plantCount, priorDeaths])
+  }, [stagesTouched, stages, deaths, leafingNoRoot, phaseInput, logDate, initial?.id])
 
   useEffect(() => {
     if (!image) {
@@ -174,7 +194,7 @@ export default function DateLogForm({
       } else if (aliveBefore != null && Number(deaths) > aliveBefore) {
         next.deaths = `Only ${aliveBefore} plant${
           aliveBefore === 1 ? '' : 's'
-        } still alive to record.`
+        } still ${hasPots ? 'in propagation' : 'alive'} to record.`
       }
       if (Number(deaths) > 0 && !deathCause.trim())
         next.deathCause = 'Say what caused the loss.'
@@ -437,7 +457,7 @@ export default function DateLogForm({
             />
             {aliveBefore != null && (
               <span className="text-xs text-on-surface-variant">
-                {aliveBefore} still alive
+                {aliveBefore} still {hasPots ? 'in propagation' : 'alive'}
               </span>
             )}
             {errors.deaths && (

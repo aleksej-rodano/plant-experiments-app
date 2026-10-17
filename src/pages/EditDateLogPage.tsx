@@ -2,9 +2,14 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import DateLogForm from '../components/DateLogForm'
+import { usePottings } from '../lib/hooks/usePottings'
 import { supabase } from '../lib/supabase'
-import { totalDeaths } from '../lib/utils/survival'
 import type { DateLog, Experiment, Folder } from '../types/database'
+
+type PhaseLog = Pick<
+  DateLog,
+  'id' | 'log_date' | 'deaths_count' | 'phase' | 'pot_id' | 'deleted_at'
+>
 
 export default function EditDateLogPage() {
   const { id, logId } = useParams<{ id: string; logId: string }>()
@@ -19,7 +24,8 @@ export default function EditDateLogPage() {
   const [plantCount, setPlantCount] = useState<number | null>(
     navState?.experiment?.plant_count ?? null,
   )
-  const [priorDeaths, setPriorDeaths] = useState<number | null>(null)
+  const [phaseLogs, setPhaseLogs] = useState<PhaseLog[] | null>(null)
+  const { pottings, pots, loading: pottingsLoading } = usePottings(id ? [id] : [])
   const [error, setError] = useState<string | null>(null)
 
   const backTo = id ? `/experiments/${id}` : '/experiments'
@@ -50,7 +56,7 @@ export default function EditDateLogPage() {
               .maybeSingle(),
         supabase
           .from('date_logs')
-          .select('id, deaths_count')
+          .select('id, log_date, deaths_count, phase, pot_id, deleted_at')
           .eq('experiment_id', id)
           .is('deleted_at', null),
       ])
@@ -61,10 +67,10 @@ export default function EditDateLogPage() {
       else if (expRow.data) setPlantCount(expRow.data.plant_count ?? null)
       if (allLogs.error) {
         setError(allLogs.error.message)
-        setPriorDeaths(0)
+        setPhaseLogs([])
       } else {
-        const others = (allLogs.data ?? []).filter((l) => l.id !== logId)
-        setPriorDeaths(totalDeaths(others))
+        // Includes the entry being edited; the form leaves it out where needed.
+        setPhaseLogs(allLogs.data ?? [])
       }
     })()
     return () => {
@@ -94,7 +100,7 @@ export default function EditDateLogPage() {
 
       {!id || !logId ? (
         <p className="text-sm text-error">Missing experiment or log id.</p>
-      ) : !log || priorDeaths == null ? (
+      ) : !log || phaseLogs == null || pottingsLoading ? (
         <div className="flex justify-center py-10">
           <Loader2 className="size-5 animate-spin text-primary" />
         </div>
@@ -103,8 +109,12 @@ export default function EditDateLogPage() {
           experimentId={id}
           mode="edit"
           initial={log}
-          plantCount={plantCount}
-          priorDeaths={priorDeaths}
+          phaseInput={{
+            experiment: { plant_count: plantCount },
+            pottings,
+            pots,
+            logs: phaseLogs,
+          }}
           backTo={backTo}
           doneState={{
             experiment: navState?.experiment,

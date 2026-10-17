@@ -10,13 +10,17 @@ import {
   ticks,
 } from '../lib/utils/chart'
 import { survivalSeries } from '../lib/utils/insights'
+import { groupByExperiment, phase1Cohort } from '../lib/utils/phases'
 import { stageDelta, stagePctSeries, stageSnapshot } from '../lib/utils/stages'
-import type { DateLog, Experiment } from '../types/database'
+import type { DateLog, Experiment, Pot, Potting } from '../types/database'
 
 interface Props {
   experiments: Experiment[]
   /** Every log across the folder; grouped by experiment internally. */
   logs: DateLog[]
+  /** Live pottings / pots of these experiments; omit when none are loaded. */
+  pottings?: Potting[]
+  pots?: Pot[]
 }
 
 interface Point {
@@ -46,6 +50,21 @@ const VH = 200
 const M = { top: 10, right: 12, bottom: 46, left: 40 }
 const PW = VW - M.left - M.right
 const PH = VH - M.top - M.bottom
+
+/** Phase 1 population at a check-in for each experiment, from its pottings. */
+function populationFor(
+  exp: Experiment,
+  expLogs: DateLog[],
+  { pottings = [], pots = [] }: Pick<Props, 'pottings' | 'pots'>,
+) {
+  const input = {
+    experiment: exp,
+    pottings: pottings.filter((p) => p.experiment_id === exp.id),
+    pots: pots.filter((p) => p.experiment_id === exp.id),
+    logs: expLogs,
+  }
+  return (asOf: string) => phase1Cohort(input, asOf)
+}
 
 function fmtPct(n: number | null) {
   return n == null ? '—' : `${Math.round(n)}%`
@@ -89,23 +108,22 @@ function TrendCell({
 
 /** Latest stage snapshot per experiment, side by side, with trend vs. the
  * previous check-in so a bare percentage doesn't have to speak for itself. */
-function SnapshotTable({ experiments, logs }: Props) {
-  const byExp = new Map<string, DateLog[]>()
-  for (const log of logs) {
-    const list = byExp.get(log.experiment_id)
-    if (list) list.push(log)
-    else byExp.set(log.experiment_id, [log])
-  }
+function SnapshotTable({ experiments, logs, pottings, pots }: Props) {
+  const byExp = groupByExperiment(logs)
 
   const rows = experiments
     .map((exp) => {
       const expLogs = byExp.get(exp.id) ?? []
-      const denom = exp.plant_count ?? null
+      const snap = stageSnapshot(
+        expLogs,
+        populationFor(exp, expLogs, { pottings, pots }),
+      )
       return {
         exp,
-        snap: stageSnapshot(expLogs, denom),
+        snap,
         delta: stageDelta(expLogs),
-        denom,
+        // Phase 1 population at the latest check-in — also the trend's base.
+        denom: snap?.started ?? null,
       }
     })
     .filter(
@@ -344,7 +362,7 @@ function MultiChart({
  * as the survival chart, distinguished by line style, with checkboxes to
  * toggle each stage and each experiment on or off.
  */
-function StageComparisonChart({ experiments, logs }: Props) {
+function StageComparisonChart({ experiments, logs, pottings, pots }: Props) {
   const [enabled, setEnabled] = useState<Record<StageKey, boolean>>({
     rooted: true,
     shoots: true,
@@ -361,19 +379,18 @@ function StageComparisonChart({ experiments, logs }: Props) {
       return next
     })
 
-  const byExp = new Map<string, DateLog[]>()
-  for (const log of logs) {
-    const list = byExp.get(log.experiment_id)
-    if (list) list.push(log)
-    else byExp.set(log.experiment_id, [log])
-  }
+  const byExp = groupByExperiment(logs)
 
   const series: Series[] = []
   experiments.forEach((exp, i) => {
     // Colour stays tied to the experiment's index, so hiding one doesn't
     // repaint the rest.
     if (hiddenExps.has(exp.id)) return
-    const pct = stagePctSeries(byExp.get(exp.id) ?? [], exp.plant_count ?? null)
+    const expLogs = byExp.get(exp.id) ?? []
+    const pct = stagePctSeries(
+      expLogs,
+      populationFor(exp, expLogs, { pottings, pots }),
+    )
     const byStage: Record<StageKey, Point[]> = {
       rooted: pct.rooted,
       shoots: pct.anyShoot,
@@ -449,15 +466,15 @@ function StageComparisonChart({ experiments, logs }: Props) {
  * which treatment is actually winning. Renders nothing until there are at least
  * two experiments with something to plot.
  */
-export default function ComparisonChart({ experiments, logs }: Props) {
+export default function ComparisonChart({
+  experiments,
+  logs,
+  pottings,
+  pots,
+}: Props) {
   if (experiments.length < 2) return null
 
-  const byExp = new Map<string, DateLog[]>()
-  for (const log of logs) {
-    const list = byExp.get(log.experiment_id)
-    if (list) list.push(log)
-    else byExp.set(log.experiment_id, [log])
-  }
+  const byExp = groupByExperiment(logs)
 
   const build = (points: (expLogs: DateLog[], exp: Experiment) => Point[]) =>
     experiments.map((exp, i) => ({
@@ -479,8 +496,18 @@ export default function ComparisonChart({ experiments, logs }: Props) {
           fixedMax={100}
         />
       )}
-      <SnapshotTable experiments={experiments} logs={logs} />
-      <StageComparisonChart experiments={experiments} logs={logs} />
+      <SnapshotTable
+        experiments={experiments}
+        logs={logs}
+        pottings={pottings}
+        pots={pots}
+      />
+      <StageComparisonChart
+        experiments={experiments}
+        logs={logs}
+        pottings={pottings}
+        pots={pots}
+      />
     </div>
   )
 }

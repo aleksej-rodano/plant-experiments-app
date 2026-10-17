@@ -19,6 +19,7 @@ import CareBanner from '../components/CareBanner'
 import ComparisonChart from '../components/ComparisonChart'
 import WinnerCallout from '../components/WinnerCallout'
 import { isNativeApp, syncCareNotifications } from '../lib/native'
+import { usePottings } from '../lib/hooks/usePottings'
 import { supabase } from '../lib/supabase'
 import { binFolder } from '../lib/utils/bin'
 import { today } from '../lib/utils/care'
@@ -70,9 +71,11 @@ export default function FolderDetailPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  const experimentIds = useMemo(() => experiments.map((e) => e.id), [experiments])
+  const { pottings, pots } = usePottings(experimentIds)
   const summaries = useMemo(
-    () => summariseAll(experiments, logs),
-    [experiments, logs],
+    () => summariseAll(experiments, logs, pottings, pots),
+    [experiments, logs, pottings, pots],
   )
   const summaryFor = (id: string) => summaries.find((s) => s.experiment.id === id)
 
@@ -377,7 +380,12 @@ export default function FolderDetailPage() {
           <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">
             Comparison
           </h2>
-          <ComparisonChart experiments={experiments} logs={logs} />
+          <ComparisonChart
+            experiments={experiments}
+            logs={logs}
+            pottings={pottings}
+            pots={pots}
+          />
         </>
       )}
 

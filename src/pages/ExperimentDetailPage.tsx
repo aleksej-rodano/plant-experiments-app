@@ -15,7 +15,9 @@ import DateLogTimeline from '../components/DateLogTimeline'
 import StageChart from '../components/StageChart'
 import StageSnapshot from '../components/StageSnapshot'
 import { isNativeApp } from '../lib/native'
+import { usePottings } from '../lib/hooks/usePottings'
 import { supabase } from '../lib/supabase'
+import { phase1Cohort, type PhaseInput } from '../lib/utils/phases'
 import { binExperiment } from '../lib/utils/bin'
 import { exportExperimentToCSV } from '../lib/utils/csvExport'
 import {
@@ -89,6 +91,18 @@ export default function ExperimentDetailPage() {
   const handleLogsChange = useCallback((next: DateLog[]) => {
     setTimelineLogs(next)
   }, [])
+
+  // Pottings / pots feed the Phase 1 population behind the stage percentages.
+  const { pottings, pots } = usePottings(id ? [id] : [])
+  const phaseInput = useMemo<PhaseInput>(
+    () => ({
+      experiment: { plant_count: experiment?.plant_count ?? null },
+      pottings,
+      pots,
+      logs: timelineLogs,
+    }),
+    [experiment?.plant_count, pottings, pots, timelineLogs],
+  )
 
   const stats = useMemo(() => {
     const initial = experiment?.plant_count ?? null
@@ -390,7 +404,7 @@ export default function ExperimentDetailPage() {
         <div className="mt-4 flex flex-col gap-4">
           <StageSnapshot
             logs={timelineLogs}
-            startedCount={experiment.plant_count ?? null}
+            population={(asOf) => phase1Cohort(phaseInput, asOf)}
           />
           <StageChart logs={timelineLogs} />
         </div>

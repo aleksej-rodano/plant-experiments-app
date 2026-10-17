@@ -1,5 +1,6 @@
-import type { DateLog, Experiment } from '../../types/database'
+import type { DateLog, Experiment, Pot, Potting } from '../../types/database'
 import { dayMs } from './chart'
+import { groupByExperiment, phase1Cohort, phase2Alive, pottedShare } from './phases'
 import {
   daysToStage,
   reachedRoot,
@@ -22,7 +23,12 @@ export interface ExperimentSummary {
   logs: DateLog[]
   initial: number | null
   deaths: number
+  /** `plant_count − Σ all deaths`, Phase 1 and pot deaths alike. */
   alive: number
+  /** Fraction of the original plants that were potted — informational only. */
+  pottedShare: number | null
+  /** Plants alive across all pots — informational only. */
+  phase2Alive: number
   /** survivors / initial, or null with no plant count to divide by. */
   rate: number | null
   /** Days from start to the first check-in with any plant at R1+. */
@@ -34,13 +40,21 @@ export interface ExperimentSummary {
   lastLogDate: string | null
 }
 
+/**
+ * Survival stays `plant_count − Σ every death` (pot deaths included), so winners
+ * and rankings are untouched by potting; `pottedShare` / `phase2Alive` ride
+ * along for display. Pass `pottings` / `pots` as `[]` when none are loaded.
+ */
 export function summarise(
   experiment: Experiment,
   logs: DateLog[],
+  pottings: Potting[] = [],
+  pots: Pot[] = [],
 ): ExperimentSummary {
   const deaths = totalDeaths(logs)
   const initial = experiment.plant_count ?? null
   const dates = logs.map((l) => l.log_date).sort()
+  const phaseInput = { experiment, pottings, pots, logs }
 
   return {
     experiment,
@@ -48,10 +62,12 @@ export function summarise(
     initial,
     deaths,
     alive: survivorCount(initial, deaths),
+    pottedShare: pottedShare(phaseInput),
+    phase2Alive: phase2Alive(phaseInput),
     rate: successRate(initial, deaths),
     daysToRoot: daysToStage(experiment, logs, reachedRoot),
     daysToLeaf: daysToStage(experiment, logs, reachedShoot),
-    snapshot: stageSnapshot(logs, initial),
+    snapshot: stageSnapshot(logs, (asOf) => phase1Cohort(phaseInput, asOf)),
     lastLogDate: dates.length > 0 ? dates[dates.length - 1] : null,
   }
 }
@@ -60,14 +76,20 @@ export function summarise(
 export function summariseAll(
   experiments: Experiment[],
   logs: DateLog[],
+  pottings: Potting[] = [],
+  pots: Pot[] = [],
 ): ExperimentSummary[] {
-  const byExp = new Map<string, DateLog[]>()
-  for (const log of logs) {
-    const list = byExp.get(log.experiment_id)
-    if (list) list.push(log)
-    else byExp.set(log.experiment_id, [log])
-  }
-  return experiments.map((e) => summarise(e, byExp.get(e.id) ?? []))
+  const byExp = groupByExperiment(logs)
+  const pottingsByExp = groupByExperiment(pottings)
+  const potsByExp = groupByExperiment(pots)
+  return experiments.map((e) =>
+    summarise(
+      e,
+      byExp.get(e.id) ?? [],
+      pottingsByExp.get(e.id) ?? [],
+      potsByExp.get(e.id) ?? [],
+    ),
+  )
 }
 
 /**

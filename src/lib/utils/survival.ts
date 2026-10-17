@@ -1,6 +1,9 @@
 import type { DateLog } from '../../types/database'
 
-/** Sum of plants lost across a set of log entries. */
+/**
+ * Sum of plants lost across a set of log entries. Phase 1 and pot deaths both
+ * live in `deaths_count`, so this is the experiment-wide total (pass live logs).
+ */
 export function totalDeaths(logs: Pick<DateLog, 'deaths_count'>[]): number {
   return logs.reduce((sum, log) => sum + (log.deaths_count ?? 0), 0)
 }

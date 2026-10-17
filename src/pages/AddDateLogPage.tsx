@@ -2,9 +2,14 @@ import { ArrowLeft, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import DateLogForm from '../components/DateLogForm'
+import { usePottings } from '../lib/hooks/usePottings'
 import { supabase } from '../lib/supabase'
-import { totalDeaths } from '../lib/utils/survival'
-import type { Experiment, Folder } from '../types/database'
+import type { DateLog, Experiment, Folder } from '../types/database'
+
+type PhaseLog = Pick<
+  DateLog,
+  'id' | 'log_date' | 'deaths_count' | 'phase' | 'pot_id' | 'deleted_at'
+>
 
 export default function AddDateLogPage() {
   const { id } = useParams<{ id: string }>()
@@ -17,7 +22,8 @@ export default function AddDateLogPage() {
   const [experiment, setExperiment] = useState<Experiment | null>(
     navState?.experiment ?? null,
   )
-  const [priorDeaths, setPriorDeaths] = useState<number | null>(null)
+  const [phaseLogs, setPhaseLogs] = useState<PhaseLog[] | null>(null)
+  const { pottings, pots, loading: pottingsLoading } = usePottings(id ? [id] : [])
   const [error, setError] = useState<string | null>(null)
 
   const backTo = id ? `/experiments/${id}` : '/experiments'
@@ -37,7 +43,7 @@ export default function AddDateLogPage() {
               .maybeSingle(),
         supabase
           .from('date_logs')
-          .select('deaths_count')
+          .select('id, log_date, deaths_count, phase, pot_id, deleted_at')
           .eq('experiment_id', id)
           .is('deleted_at', null),
       ])
@@ -45,7 +51,7 @@ export default function AddDateLogPage() {
       if (expRes.error) setError(expRes.error.message)
       else if (expRes.data) setExperiment(expRes.data)
       if (logRes.error) setError(logRes.error.message)
-      setPriorDeaths(totalDeaths(logRes.data ?? []))
+      setPhaseLogs(logRes.data ?? [])
     })()
     return () => {
       cancelled = true
@@ -75,7 +81,7 @@ export default function AddDateLogPage() {
 
       {!id ? (
         <p className="text-sm text-error">Missing experiment id.</p>
-      ) : priorDeaths == null ? (
+      ) : phaseLogs == null || pottingsLoading ? (
         <div className="flex justify-center py-10">
           <Loader2 className="size-5 animate-spin text-primary" />
         </div>
@@ -83,8 +89,12 @@ export default function AddDateLogPage() {
         <DateLogForm
           experimentId={id}
           mode="add"
-          plantCount={experiment?.plant_count ?? null}
-          priorDeaths={priorDeaths}
+          phaseInput={{
+            experiment: { plant_count: experiment?.plant_count ?? null },
+            pottings,
+            pots,
+            logs: phaseLogs,
+          }}
           backTo={backTo}
           doneState={{ experiment, folder: navState?.folder }}
           successToast="Log entry added."
