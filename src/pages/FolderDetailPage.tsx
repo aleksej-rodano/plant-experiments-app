@@ -3,6 +3,7 @@ import {
   CalendarPlus,
   CheckCircle2,
   ChevronRight,
+  Flower2,
   FlaskConical,
   Loader2,
   MapPin,
@@ -24,6 +25,13 @@ import { supabase } from '../lib/supabase'
 import { binFolder } from '../lib/utils/bin'
 import { today } from '../lib/utils/care'
 import { exportFolderToCSV } from '../lib/utils/csvExport'
+import {
+  NO_PHASE_COUNTS,
+  addPhaseCounts,
+  experimentPhaseCounts,
+  phaseCountsLabel,
+  type PhaseCounts,
+} from '../lib/utils/folderPhases'
 import { summariseAll } from '../lib/utils/insights'
 import {
   SURVIVAL_TEXT_CLASS,
@@ -78,6 +86,50 @@ export default function FolderDetailPage() {
     [experiments, logs, pottings, pots],
   )
   const summaryFor = (id: string) => summaries.find((s) => s.experiment.id === id)
+
+  // Plants still propagating / alive in pots, per experiment and folder-wide.
+  const phaseCounts = useMemo(() => {
+    const byExp = new Map<string, PhaseCounts>()
+    let folderTotal = NO_PHASE_COUNTS
+    for (const s of summaries) {
+      const c = experimentPhaseCounts(
+        s.experiment,
+        s.logs,
+        pottings.filter((p) => p.experiment_id === s.experiment.id),
+        pots.filter((p) => p.experiment_id === s.experiment.id),
+      )
+      byExp.set(s.experiment.id, c)
+      folderTotal = addPhaseCounts(folderTotal, c)
+    }
+    return { byExp, folderTotal }
+  }, [summaries, pottings, pots])
+
+  // Selection mode: tick experiments, then pot them all in one go.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  // An experiment with no plants left in Phase 1 has nothing to pot.
+  const canPot = (id: string) => {
+    const exp = experiments.find((e) => e.id === id)
+    return (
+      exp?.plant_count == null ||
+      (phaseCounts.byExp.get(id)?.propagating ?? 0) > 0
+    )
+  }
+  const selectableIds = experiments.filter((e) => canPot(e.id)).map((e) => e.id)
+  const selectedIds = experiments
+    .map((e) => e.id)
+    .filter((id) => selected.has(id) && canPot(id))
+  const toggleSelected = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  const cancelSelection = () => {
+    setSelecting(false)
+    setSelected(new Set())
+  }
 
   const totalPlants = experiments.reduce(
     (sum, e) => sum + (e.plant_count ?? 0),
@@ -345,6 +397,15 @@ export default function FolderDetailPage() {
             </span>
           </dd>
         </div>
+        <div className="rounded-lg bg-surface-container px-3 py-2">
+          <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
+            <Flower2 className="size-3.5" />
+            Phases
+          </dt>
+          <dd className="mt-0.5 text-on-surface">
+            {phaseCountsLabel(phaseCounts.folderTotal)}
+          </dd>
+        </div>
         {folder.origin && (
           <div className="rounded-lg bg-surface-container px-3 py-2">
             <dt className="flex items-center gap-1 text-xs text-on-surface-variant">
@@ -389,9 +450,68 @@ export default function FolderDetailPage() {
         </>
       )}
 
-      <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">
-        Experiments
-      </h2>
+      <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-medium text-on-surface">Experiments</h2>
+        {experiments.length > 0 && !selecting && (
+          <button
+            type="button"
+            onClick={() => setSelecting(true)}
+            title="Tick several experiments and pot them in one go"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
+          >
+            <Flower2 className="size-4" />
+            <span>Select experiments</span>
+          </button>
+        )}
+      </div>
+
+      {selecting && (
+        <div className="mb-3 flex flex-col gap-2 rounded-lg bg-secondary-container px-3 py-3 text-sm text-on-secondary-container">
+          <p>
+            {selectedIds.length === 0
+              ? 'Tick the experiments to pot.'
+              : `${selectedIds.length} of ${experiments.length} selected.`}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setSelected(
+                  selectedIds.length === selectableIds.length
+                    ? new Set()
+                    : new Set(selectableIds),
+                )
+              }
+              className="rounded-lg px-3 py-2 text-sm font-medium ring-1 ring-outline hover:bg-surface-variant"
+            >
+              {selectedIds.length === selectableIds.length
+                ? 'Clear selection'
+                : 'Select all'}
+            </button>
+            <button
+              type="button"
+              onClick={cancelSelection}
+              className="rounded-lg px-3 py-2 text-sm font-medium ring-1 ring-outline hover:bg-surface-variant"
+            >
+              Cancel selection
+            </button>
+            <button
+              type="button"
+              disabled={selectedIds.length === 0}
+              onClick={() =>
+                navigate(
+                  `/folders/${folder.id}/pot?ids=${selectedIds.join(',')}`,
+                  { state: { folder } },
+                )
+              }
+              className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-on-primary hover:opacity-90 disabled:opacity-50"
+            >
+              <Flower2 className="size-4" />
+              <span>Pot selected experiments</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {expLoading && experiments.length === 0 ? (
         <div className="flex justify-center py-10">
@@ -407,13 +527,22 @@ export default function FolderDetailPage() {
         </div>
       ) : (
         <ul className="flex flex-col gap-2">
-          {experiments.map((exp) => (
-            <li key={exp.id}>
-              <Link
-                to={`/experiments/${exp.id}`}
-                state={{ experiment: exp, folder }}
-                className="flex items-center justify-between gap-3 rounded-lg bg-surface-container px-4 py-3 hover:opacity-90"
-              >
+          {experiments.map((exp) => {
+            const pickable = canPot(exp.id)
+            const rowClass =
+              'flex items-center justify-between gap-3 rounded-lg bg-surface-container px-4 py-3 hover:opacity-90'
+            const rowBody = (
+              <>
+                {selecting && (
+                  <input
+                    type="checkbox"
+                    checked={selected.has(exp.id) && pickable}
+                    disabled={!pickable}
+                    onChange={() => toggleSelected(exp.id)}
+                    aria-label={`Select ${exp.title}`}
+                    className="size-5 shrink-0 rounded"
+                  />
+                )}
                 {exp.cover_image_url && (
                   <img
                     src={exp.cover_image_url}
@@ -449,11 +578,38 @@ export default function FolderDetailPage() {
                     {exp.status !== 'ongoing' ? ` · ${exp.status}` : ''}
                     {exp.notes ? ` · ${exp.notes}` : ''}
                   </span>
+                  <span className="block truncate text-xs text-on-surface-variant">
+                    {phaseCountsLabel(
+                      phaseCounts.byExp.get(exp.id) ?? NO_PHASE_COUNTS,
+                    )}
+                    {selecting && !pickable ? ' · nothing left to pot' : ''}
+                  </span>
                 </span>
-                <ChevronRight className="size-4 shrink-0 text-on-surface-variant" />
-              </Link>
-            </li>
-          ))}
+                {!selecting && (
+                  <ChevronRight className="size-4 shrink-0 text-on-surface-variant" />
+                )}
+              </>
+            )
+            return (
+              <li key={exp.id}>
+                {selecting ? (
+                  <label
+                    className={`${rowClass} ${pickable ? 'cursor-pointer' : 'opacity-60'}`}
+                  >
+                    {rowBody}
+                  </label>
+                ) : (
+                  <Link
+                    to={`/experiments/${exp.id}`}
+                    state={{ experiment: exp, folder }}
+                    className={rowClass}
+                  >
+                    {rowBody}
+                  </Link>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
 

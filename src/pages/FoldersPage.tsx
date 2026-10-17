@@ -4,6 +4,12 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import FolderCard from '../components/FolderCard'
 import { supabase } from '../lib/supabase'
 import { binFolder } from '../lib/utils/bin'
+import {
+  NO_PHASE_COUNTS,
+  addPhaseCounts,
+  phaseCountsByExperiment,
+  type PhaseCounts,
+} from '../lib/utils/folderPhases'
 import { survivorCount } from '../lib/utils/survival'
 import type { Folder } from '../types/database'
 
@@ -12,6 +18,7 @@ export default function FoldersPage() {
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [plantTotals, setPlantTotals] = useState<Record<string, number>>({})
   const [aliveTotals, setAliveTotals] = useState<Record<string, number>>({})
+  const [phaseTotals, setPhaseTotals] = useState<Record<string, PhaseCounts>>({})
   const [loading, setLoading] = useState(true)
   const [slow, setSlow] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +46,7 @@ export default function FoldersPage() {
     const abortTimer = setTimeout(() => controller.abort(), 15000)
 
     try {
-      const [foldersRes, expRes, deathRes] = await Promise.all([
+      const [foldersRes, expRes, deathRes, pottingRes, potRes] = await Promise.all([
         supabase
           .from('folders')
           .select()
@@ -53,13 +60,39 @@ export default function FoldersPage() {
           .abortSignal(controller.signal),
         supabase
           .from('date_logs')
-          .select('experiment_id, deaths_count')
+          .select('id, experiment_id, log_date, deaths_count, phase, pot_id, deleted_at')
+          .is('deleted_at', null)
+          .abortSignal(controller.signal),
+        supabase
+          .from('pottings')
+          .select()
+          .is('deleted_at', null)
+          .abortSignal(controller.signal),
+        supabase
+          .from('pots')
+          .select()
           .is('deleted_at', null)
           .abortSignal(controller.signal),
       ])
       if (foldersRes.error) throw foldersRes.error
       if (expRes.error) throw expRes.error
       if (deathRes.error) throw deathRes.error
+      // Potting figures are extra: if they fail to load the cards just show
+      // everything as still propagating, as before potting existed.
+      if (pottingRes.error || potRes.error) {
+        console.error(
+          'Could not load pottings',
+          (pottingRes.error ?? potRes.error)?.message,
+        )
+      }
+      const pottings = pottingRes.error ? [] : (pottingRes.data ?? [])
+      const pots = potRes.error ? [] : (potRes.data ?? [])
+      const phaseByExp = phaseCountsByExperiment(
+        expRes.data ?? [],
+        deathRes.data ?? [],
+        pottings,
+        pots,
+      )
 
       const deathsByExp: Record<string, number> = {}
       for (const row of deathRes.data ?? []) {
@@ -70,6 +103,7 @@ export default function FoldersPage() {
       const tally: Record<string, number> = {}
       const plants: Record<string, number> = {}
       const alive: Record<string, number> = {}
+      const phases: Record<string, PhaseCounts> = {}
       for (const row of expRes.data ?? []) {
         tally[row.folder_id] = (tally[row.folder_id] ?? 0) + 1
         plants[row.folder_id] =
@@ -77,11 +111,16 @@ export default function FoldersPage() {
         alive[row.folder_id] =
           (alive[row.folder_id] ?? 0) +
           survivorCount(row.plant_count, deathsByExp[row.id] ?? 0)
+        phases[row.folder_id] = addPhaseCounts(
+          phases[row.folder_id] ?? NO_PHASE_COUNTS,
+          phaseByExp.get(row.id) ?? NO_PHASE_COUNTS,
+        )
       }
       setFolders(foldersRes.data ?? [])
       setCounts(tally)
       setPlantTotals(plants)
       setAliveTotals(alive)
+      setPhaseTotals(phases)
     } catch (e) {
       setError(
         controller.signal.aborted
@@ -183,6 +222,7 @@ export default function FoldersPage() {
               experimentCount={counts[folder.id] ?? 0}
               plantTotal={plantTotals[folder.id] ?? 0}
               aliveTotal={aliveTotals[folder.id] ?? 0}
+              phaseCounts={phaseTotals[folder.id]}
               onDelete={handleDelete}
             />
           ))}

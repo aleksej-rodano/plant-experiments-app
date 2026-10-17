@@ -216,7 +216,26 @@ Working today:
   check-ins and an atomic `create_potting` RPC that refuses to pot more plants
   than Phase 1 still holds. Pottings and pots already go through the bin
   (delete/restore/purge, pot photos included) and are included in the JSON
-  backup. The folder-level potting comes in a later stage — see `PHASE2_PLAN.md`.
+  backup. See `PHASE2_PLAN.md` for the plan.
+- **Potting several experiments at once (Stage 7).** On a folder page,
+  **Select experiments** turns the list into checkboxes (**Select all** /
+  **Cancel selection**; an experiment with no Phase 1 plants left cannot be
+  ticked) and **Pot selected experiments** opens `/folders/:folderId/pot?ids=…` (`PotSelectedPage.tsx`). One shared date plus optional shared pot size,
+  substrate and notes, which are copied into every pot row as you type and can
+  still be edited per pot (rows added later start with them too). Each selected
+  experiment gets its own section with the plants available to pot, the "up to X
+  may be ready" hint and the same pot-row editor as the single-experiment flow.
+  Save uploads photos and calls `create_potting` once per experiment, one after the
+  other (each its own transaction). If some fail (for example someone logged
+  deaths meanwhile and the RPC refuses to over-pot), the page lists the ones
+  already potted, drops them from the form and keeps the failed ones, each with
+  the server's message, for **Retry failed pottings**. Folder cards, the folder
+  page (a "Phases" tile and every experiment row) show **"A propagating · B
+  potted"**: A = plants still in Phase 1 (`phase1Spare`), B = plants alive in pots
+  (`phase2Alive`); helpers in `src/lib/utils/folderPhases.ts`. The folder
+  comparison's snapshot table has two informational columns, **Potted % of
+  original** and **Alive in pots**; the winner callout, ranking and status are
+  untouched (decision 8).
 - **Plant accounting for the two phases** lives in one place,
   `src/lib/utils/phases.ts`: `phase1Cohort(asOf)` (plants still part of Phase 1
   on a date — the denominator of stage percentages and warnings, which for an

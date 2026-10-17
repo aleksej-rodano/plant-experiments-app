@@ -2,6 +2,7 @@ import { AlarmClock, FolderOpen, Loader2, MapPin, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CARE_TILE_CLASS, careStatus } from '../lib/utils/care'
+import { phaseCountsLabel, type PhaseCounts } from '../lib/utils/folderPhases'
 import { SURVIVAL_TEXT_CLASS, survivalLevel } from '../lib/utils/survival'
 import type { Folder } from '../types/database'
 
@@ -10,6 +11,8 @@ interface Props {
   experimentCount?: number
   plantTotal?: number
   aliveTotal?: number
+  /** Plants still propagating / alive in pots, for the "A propagating · B potted" line. */
+  phaseCounts?: PhaseCounts
   onDelete: (id: string) => Promise<void>
 }
 
@@ -18,6 +21,7 @@ export default function FolderCard({
   experimentCount,
   plantTotal,
   aliveTotal,
+  phaseCounts,
   onDelete,
 }: Props) {
   const [confirming, setConfirming] = useState(false)
@@ -95,6 +99,7 @@ export default function FolderCard({
                     {plantTotal} plant{plantTotal === 1 ? '' : 's'}
                   </p>
                 ))}
+              {phaseCounts && <p>{phaseCountsLabel(phaseCounts)}</p>}
             </div>
           )}
           {folder.origin && (

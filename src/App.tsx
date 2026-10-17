@@ -21,6 +21,7 @@ import LoginPage from './pages/LoginPage'
 import NotesPage from './pages/NotesPage'
 import PestControlPage from './pages/PestControlPage'
 import PotPlantsPage from './pages/PotPlantsPage'
+import PotSelectedPage from './pages/PotSelectedPage'
 import QuickPhotoLogPage from './pages/QuickPhotoLogPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SettingsPage from './pages/SettingsPage'
@@ -91,6 +92,10 @@ function App() {
             <Route
               path="/folders/:folderId/experiments/new"
               element={<CreateExperimentPage />}
+            />
+            <Route
+              path="/folders/:folderId/pot"
+              element={<PotSelectedPage />}
             />
             <Route
               path="/folders/:folderId/logs/new"

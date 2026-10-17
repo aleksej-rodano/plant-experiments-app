@@ -10,7 +10,12 @@ import {
   ticks,
 } from '../lib/utils/chart'
 import { survivalSeries } from '../lib/utils/insights'
-import { groupByExperiment, phase1Cohort } from '../lib/utils/phases'
+import {
+  groupByExperiment,
+  phase1Cohort,
+  phase2Alive,
+  pottedShare,
+} from '../lib/utils/phases'
 import { stageDelta, stagePctSeries, stageSnapshot } from '../lib/utils/stages'
 import type { DateLog, Experiment, Pot, Potting } from '../types/database'
 
@@ -64,6 +69,25 @@ function populationFor(
     logs: expLogs,
   }
   return (asOf: string) => phase1Cohort(input, asOf)
+}
+
+/** Informational Phase 2 figures for one experiment (never used for ranking). */
+function pottingFigures(
+  exp: Experiment,
+  expLogs: DateLog[],
+  { pottings = [], pots = [] }: Pick<Props, 'pottings' | 'pots'>,
+) {
+  const input = {
+    experiment: exp,
+    pottings: pottings.filter((p) => p.experiment_id === exp.id),
+    pots: pots.filter((p) => p.experiment_id === exp.id),
+    logs: expLogs,
+  }
+  const share = pottedShare(input)
+  return {
+    pottedPct: share == null ? null : share * 100,
+    aliveInPots: phase2Alive(input),
+  }
 }
 
 function fmtPct(n: number | null) {
@@ -124,6 +148,7 @@ function SnapshotTable({ experiments, logs, pottings, pots }: Props) {
         delta: stageDelta(expLogs),
         // Phase 1 population at the latest check-in — also the trend's base.
         denom: snap?.started ?? null,
+        ...pottingFigures(exp, expLogs, { pottings, pots }),
       }
     })
     .filter(
@@ -134,6 +159,8 @@ function SnapshotTable({ experiments, logs, pottings, pots }: Props) {
         snap: NonNullable<typeof r.snap>
         delta: NonNullable<typeof r.delta>
         denom: number | null
+        pottedPct: number | null
+        aliveInPots: number
       } => Boolean(r.snap) && Boolean(r.delta),
     )
 
@@ -142,7 +169,8 @@ function SnapshotTable({ experiments, logs, pottings, pots }: Props) {
   return (
     <figure className="min-w-0 overflow-x-auto rounded-lg bg-surface-container p-3">
       <figcaption className="mb-2 text-xs text-on-surface-variant">
-        Latest snapshot — each experiment, vs. its previous check-in
+        Latest snapshot — each experiment, vs. its previous check-in. The last
+        two columns are informational only.
       </figcaption>
       <table className="w-full text-left text-xs">
         <thead className="text-on-surface-variant">
@@ -151,10 +179,12 @@ function SnapshotTable({ experiments, logs, pottings, pots }: Props) {
             <th className="pb-1 px-2 font-medium">Rooted</th>
             <th className="pb-1 px-2 font-medium">Any shoot</th>
             <th className="pb-1 px-2 font-medium">Established</th>
+            <th className="pb-1 px-2 font-medium">Potted % of original</th>
+            <th className="pb-1 px-2 font-medium">Alive in pots</th>
           </tr>
         </thead>
         <tbody className="text-on-surface">
-          {rows.map(({ exp, snap, delta, denom }) => (
+          {rows.map(({ exp, snap, delta, denom, pottedPct, aliveInPots }) => (
             <tr key={exp.id} className="border-t border-outline-variant">
               <td className="max-w-32 truncate py-1 pr-2">{exp.title}</td>
               <td className="px-2 py-1">
@@ -175,6 +205,8 @@ function SnapshotTable({ experiments, logs, pottings, pots }: Props) {
                   delta={pctDelta(delta.establishedDelta, denom)}
                 />
               </td>
+              <td className="px-2 py-1">{fmtPct(pottedPct)}</td>
+              <td className="px-2 py-1">{aliveInPots}</td>
             </tr>
           ))}
         </tbody>
