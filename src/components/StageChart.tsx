@@ -55,7 +55,7 @@ function StackedBars({
   return (
     <figure className="min-w-0 rounded-lg bg-surface-container p-3">
       <figcaption className="mb-1 text-xs text-on-surface-variant">
-        {title} <span className="text-on-surface-variant/70">(plants)</span>
+        {title}
       </figcaption>
       <svg
         viewBox={`0 0 ${VW} ${VH}`}
