@@ -434,6 +434,12 @@ export default function ExperimentDetailPage() {
           setToast('Potting moved to the bin.')
           setTimeout(() => setToast(null), 3000)
         }}
+        onLogged={(message) => {
+          // Reload the timeline and the pot counts behind the new entry.
+          setPhaseRefresh((n) => n + 1)
+          setToast(message)
+          setTimeout(() => setToast(null), 3000)
+        }}
       />
 
       <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">Timeline</h2>
@@ -442,6 +448,8 @@ export default function ExperimentDetailPage() {
         experimentId={experiment.id}
         experiment={experiment}
         folder={folder}
+        pottings={pottings}
+        pots={pots}
         onLogsChange={handleLogsChange}
       />
 

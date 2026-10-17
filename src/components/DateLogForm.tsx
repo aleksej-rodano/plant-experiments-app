@@ -11,9 +11,11 @@ import {
   phase1Cohort,
   phase1Deaths,
   phase1Spare,
+  potAlive,
   pottedShare,
   type PhaseInput,
 } from '../lib/utils/phases'
+import { pottedOnOf } from '../lib/utils/potLogs'
 import {
   ROOT_STAGES,
   SHOOT_STAGES,
@@ -21,7 +23,7 @@ import {
   stageWarnings,
 } from '../lib/utils/stages'
 import { DEATH_CAUSE_SUGGESTIONS } from '../lib/utils/survival'
-import type { DateLog } from '../types/database'
+import type { DateLog, LogPhase, Pot, Potting } from '../types/database'
 
 const inputClass =
   'rounded-lg border-outline bg-surface px-3 py-2 text-on-surface focus:border-primary focus:ring-primary'
@@ -29,6 +31,17 @@ const inputClass =
 interface Props {
   experimentId: string
   mode: 'add' | 'edit'
+  /**
+   * Which phase this entry belongs to. 'potted' is the Phase 2 pot check-in form
+   * (pot selector, health counts, no root/leaf tracks); the default
+   * 'propagation' is the original form, unchanged.
+   */
+  phase?: LogPhase
+  /** Pot to preselect (add mode, Phase 2). */
+  initialPotId?: string | null
+  /** Live pottings / pots of this experiment — the Phase 2 pot selector. */
+  pottings?: Potting[]
+  pots?: Pot[]
   /** The row being edited (edit mode only). */
   initial?: DateLog
   /**
@@ -57,6 +70,10 @@ const STAGE_KEYS = [
 export default function DateLogForm({
   experimentId,
   mode,
+  phase = 'propagation',
+  initialPotId,
+  pottings = [],
+  pots = [],
   initial,
   phaseInput,
   backTo,
@@ -65,6 +82,31 @@ export default function DateLogForm({
 }: Props) {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const potted = phase === 'potted'
+
+  // Phase 2: which pot the entry belongs to, and the health tally of that pot.
+  const sortedPots = useMemo(
+    () =>
+      [...pots].sort((a, b) => {
+        const da = pottedOnOf(a, pottings) ?? ''
+        const db = pottedOnOf(b, pottings) ?? ''
+        return da === db
+          ? a.created_at.localeCompare(b.created_at)
+          : da.localeCompare(db)
+      }),
+    [pots, pottings],
+  )
+  const [potId, setPotId] = useState(() => {
+    const wanted = initial?.pot_id ?? initialPotId ?? ''
+    if (wanted && pots.some((p) => p.id === wanted)) return wanted
+    return pots.length === 1 ? pots[0].id : ''
+  })
+  const [health, setHealth] = useState({
+    good: numOrEmpty(initial?.health_good),
+    ok: numOrEmpty(initial?.health_ok),
+    poor: numOrEmpty(initial?.health_poor),
+  })
+  const selectedPot = pots.find((p) => p.id === potId)
 
   const [logDate, setLogDate] = useState(initial?.log_date ?? today())
   const [statusDetails, setStatusDetails] = useState(
@@ -104,11 +146,31 @@ export default function DateLogForm({
   // been potted or died in any other Phase 1 entry, whatever this entry's date
   // (Phase 1 only shrinks, so a backdated death must leave room for later ones).
   // Editing: this entry's own deaths are added back.
-  const aliveBefore = phase1Spare(phaseInput, { excludeLogId: initial?.id })
+  // Phase 2: the cap is the chosen pot's alive count (all-time, since a pot only
+  // loses plants), again with this entry's own deaths added back when editing.
+  const aliveBefore = potted
+    ? potId
+      ? potAlive(phaseInput, potId, undefined, { excludeLogId: initial?.id })
+      : null
+    : phase1Spare(phaseInput, { excludeLogId: initial?.id })
   const hasPots = (pottedShare(phaseInput) ?? 0) > 0
 
   const stagesTouched =
-    STAGE_KEYS.some((k) => stages[k].trim() !== '') || leafingNoRoot.trim() !== ''
+    !potted &&
+    (STAGE_KEYS.some((k) => stages[k].trim() !== '') ||
+      leafingNoRoot.trim() !== '')
+
+  // Soft warning: the health tally describes the plants alive after this entry.
+  const healthSum =
+    (Number(health.good) || 0) + (Number(health.ok) || 0) + (Number(health.poor) || 0)
+  const aliveAfter =
+    aliveBefore == null ? null : aliveBefore - (Number(deaths) || 0)
+  const healthWarning =
+    potted && aliveAfter != null && healthSum > Math.max(0, aliveAfter)
+      ? `Health counts add up to ${healthSum}, but only ${Math.max(0, aliveAfter)} plant${
+          Math.max(0, aliveAfter) === 1 ? ' is' : 's are'
+        } alive in this pot.`
+      : null
 
   // Live soft warnings — a synthetic DateLog carrying just what's typed so far.
   const warnings = useMemo(() => {
@@ -179,6 +241,19 @@ export default function DateLogForm({
     if (!logDate) next.logDate = 'Pick a date.'
     else if (logDate > today()) next.logDate = 'Date cannot be in the future.'
 
+    if (potted) {
+      if (!selectedPot) next.pot = 'Choose the pot this check-in is for.'
+      else {
+        const pottedOn = pottedOnOf(selectedPot, pottings)
+        if (logDate && pottedOn && logDate < pottedOn)
+          next.logDate = `This pot was potted on ${pottedOn}; pick that date or later.`
+      }
+      for (const k of ['good', 'ok', 'poor'] as const) {
+        if (health[k].trim() && !wholeNonNeg(health[k]))
+          next[`health_${k}`] = 'Whole number ≥ 0.'
+      }
+    }
+
     for (const k of STAGE_KEYS) {
       if (stages[k].trim() && !wholeNonNeg(stages[k])) {
         next[k] = 'Whole number ≥ 0.'
@@ -194,7 +269,7 @@ export default function DateLogForm({
       } else if (aliveBefore != null && Number(deaths) > aliveBefore) {
         next.deaths = `Only ${aliveBefore} plant${
           aliveBefore === 1 ? '' : 's'
-        } still ${hasPots ? 'in propagation' : 'alive'} to record.`
+        } still ${potted ? 'alive in this pot' : hasPots ? 'in propagation' : 'alive'} to record.`
       }
       if (Number(deaths) > 0 && !deathCause.trim())
         next.deathCause = 'Say what caused the loss.'
@@ -209,6 +284,10 @@ export default function DateLogForm({
       setSubmitError('You must be signed in.')
       return
     }
+    if (potted && !selectedPot) {
+      setErrors((e) => ({ ...e, pot: 'Choose the pot first.' }))
+      return
+    }
     setBusy(true)
     setQuickPending(kind)
     try {
@@ -219,6 +298,7 @@ export default function DateLogForm({
         deaths_count: 0,
         watered: kind === 'watered',
         fertilized: kind === 'fertilized',
+        ...(potted ? { phase: 'potted' as const, pot_id: selectedPot!.id } : {}),
       })
       if (error) throw error
       navigate(backTo, {
@@ -264,6 +344,20 @@ export default function DateLogForm({
         ]),
       )
 
+      // The health tally saves as a unit, like the stage buckets: touch one and
+      // all three are written (blank = 0); leave them all blank and all stay null.
+      const healthTouched =
+        health.good.trim() !== '' ||
+        health.ok.trim() !== '' ||
+        health.poor.trim() !== ''
+      const healthFields = potted
+        ? {
+            health_good: healthTouched ? Number(health.good) || 0 : null,
+            health_ok: healthTouched ? Number(health.ok) || 0 : null,
+            health_poor: healthTouched ? Number(health.poor) || 0 : null,
+          }
+        : {}
+
       const fields = {
         log_date: logDate,
         status_details: statusDetails.trim(),
@@ -276,6 +370,9 @@ export default function DateLogForm({
           : null,
         deaths_count: deathsN,
         death_cause: deathsN > 0 ? deathCause.trim() : null,
+        ...(potted
+          ? { phase: 'potted' as const, pot_id: selectedPot!.id, ...healthFields }
+          : {}),
       }
 
       if (mode === 'edit' && initial) {
@@ -314,7 +411,8 @@ export default function DateLogForm({
           onLog={(kind) => void quickLog(kind)}
           busy={busy}
           pending={quickPending}
-          kinds={['fertilized']}
+          kinds={potted ? ['watered', 'fertilized'] : ['fertilized']}
+          pot={potted && selectedPot ? { id: selectedPot.id, label: selectedPot.label } : undefined}
         />
       )}
 
@@ -332,6 +430,28 @@ export default function DateLogForm({
         )}
       </label>
 
+      {potted && (
+        <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
+          Pot *
+          <select
+            value={potId}
+            onChange={(e) => setPotId(e.target.value)}
+            className={inputClass}
+          >
+            <option value="">Choose a pot…</option>
+            {sortedPots.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label} — {potAlive(phaseInput, p.id, undefined, {
+                  excludeLogId: initial?.id,
+                })}
+                /{p.plant_count} alive
+              </option>
+            ))}
+          </select>
+          {errors.pot && <span className="text-xs text-error">{errors.pot}</span>}
+        </label>
+      )}
+
       <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
         Notes
         <textarea
@@ -343,6 +463,8 @@ export default function DateLogForm({
         />
       </label>
 
+      {!potted && (
+      <>
       <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
         <legend className="px-1 text-sm text-on-surface-variant">
           Root track
@@ -400,12 +522,59 @@ export default function DateLogForm({
           ))}
         </div>
       </fieldset>
+      </>
+      )}
 
       <fieldset className="flex flex-col gap-3 rounded-lg border border-outline-variant p-3">
         <legend className="px-1 text-sm text-on-surface-variant">
           This check-in
         </legend>
 
+        {potted && (
+          <div className="flex flex-col gap-1 text-sm text-on-surface-variant">
+            Health of the plants in this pot
+            <div className="grid grid-cols-3 gap-3">
+              {(
+                [
+                  ['good', 'Good'],
+                  ['ok', 'OK'],
+                  ['poor', 'Poor'],
+                ] as const
+              ).map(([k, label]) => (
+                <label
+                  key={k}
+                  className="flex flex-col gap-1 text-xs text-on-surface-variant"
+                >
+                  {label}
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    inputMode="numeric"
+                    value={health[k]}
+                    onChange={(e) =>
+                      setHealth((h) => ({ ...h, [k]: e.target.value }))
+                    }
+                    className={inputClass}
+                  />
+                  {errors[`health_${k}`] && (
+                    <span className="text-error">{errors[`health_${k}`]}</span>
+                  )}
+                </label>
+              ))}
+            </div>
+            {healthWarning && (
+              <p className="flex items-start gap-1.5 text-xs">
+                <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-error" />
+                <span>
+                  {healthWarning} Saving is fine — just double-check the counts.
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {!potted && (
         <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
           Leafing without rooting
           <input
@@ -425,6 +594,7 @@ export default function DateLogForm({
             <span className="text-xs text-error">{errors.leafingNoRoot}</span>
           )}
         </label>
+        )}
 
         <div className="grid grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-sm text-on-surface-variant">
@@ -457,7 +627,8 @@ export default function DateLogForm({
             />
             {aliveBefore != null && (
               <span className="text-xs text-on-surface-variant">
-                {aliveBefore} still {hasPots ? 'in propagation' : 'alive'}
+                {aliveBefore} still{' '}
+                {potted ? 'alive in this pot' : hasPots ? 'in propagation' : 'alive'}
               </span>
             )}
             {errors.deaths && (

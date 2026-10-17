@@ -192,13 +192,31 @@ Working today:
   for the pot, never above its count plus the plants left in Phase 1) and
   **Delete potting** (confirms how many plants return to Phase 1 and how many pot
   check-ins go to the bin with it).
+- **Phase 2 check-ins (Stage 5).** Every Phase 2 log (`phase = 'potted'`) belongs
+  to exactly one pot. The date-log pages are phase-aware: the phase comes from the
+  URL — `/experiments/:id/logs/new?phase=potted&pot=<potId>` opens the **pot
+  check-in form** (date, required **Pot** selector, plants died with a cause once
+  > 0 and capped at that pot's `potAlive` — the edited log's own deaths added back
+  via `excludeLogId` — health good / ok / poor with a soft warning when the sum
+  exceeds the plants alive after this entry, photo, notes; no root/leaf tracks);
+  without `phase=potted` it is the unchanged Phase 1 form. Editing a log
+  (`/experiments/:id/logs/:logId/edit`) follows the log's own `phase`.
+  `/experiments/:id/logs/photo?pot=<potId>` is the Phase 2 quick photo. Each pot
+  in the **Pottings** section has **Add check-in**, **Log photo** (web only, like
+  the experiment's own), **Plant watered** and **Fertilized** (one tap, dated
+  today); all write `phase='potted'` + that `pot_id` (a DB CHECK enforces the
+  pot). The timeline shows a phase badge (once the experiment has a potting),
+  "Pot: <label>", "Health g / o / p" and the death chip on pot check-ins, and each
+  potting as a row ("Potted 4 plants into 2 pots"). Pot deaths count in the
+  experiment's survival (`deaths_count` as before). The care schedule is
+  unchanged. Helpers: `src/lib/utils/potLogs.ts`.
 - **Phase 2 (potting) — schema.** The database now has `pottings`
   (a potting event on a date) and `pots` (individual pots, each with its own
   plant count and photo), plus `phase` / `pot_id` / `health_good|ok|poor` on
   check-ins and an atomic `create_potting` RPC that refuses to pot more plants
   than Phase 1 still holds. Pottings and pots already go through the bin
   (delete/restore/purge, pot photos included) and are included in the JSON
-  backup. Phase 2 check-ins and the folder-level potting come in later stages — see `PHASE2_PLAN.md`.
+  backup. The folder-level potting comes in a later stage — see `PHASE2_PLAN.md`.
 - **Plant accounting for the two phases** lives in one place,
   `src/lib/utils/phases.ts`: `phase1Cohort(asOf)` (plants still part of Phase 1
   on a date — the denominator of stage percentages and warnings, which for an

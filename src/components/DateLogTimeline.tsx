@@ -1,6 +1,8 @@
 import {
   Droplets,
   FlaskConical,
+  Flower2,
+  HeartPulse,
   Loader2,
   Pencil,
   Skull,
@@ -13,12 +15,26 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { binRow } from '../lib/utils/bin'
+import { plantsLabel, potsLabel } from '../lib/utils/potting'
 import { stageEntry } from '../lib/utils/stages'
-import type { DateLog, Experiment, Folder } from '../types/database'
+import type {
+  DateLog,
+  Experiment,
+  Folder,
+  Pot,
+  Potting,
+} from '../types/database'
 import ImageLightbox from './ImageLightbox'
+
+type Row =
+  | { kind: 'log'; date: string; log: DateLog }
+  | { kind: 'potting'; date: string; potting: Potting }
 
 interface Props {
   experimentId: string
+  /** Live pottings / pots: potting events show as rows and pot ids as labels. */
+  pottings?: Potting[]
+  pots?: Pot[]
   /** Render these immediately (no spinner) while the real list loads in the background. */
   initialLogs?: DateLog[]
   /** Passed into the edit-log route as navigation state. */
@@ -38,6 +54,8 @@ function formatLogDate(value: string) {
 
 export default function DateLogTimeline({
   experimentId,
+  pottings = [],
+  pots = [],
   initialLogs,
   experiment,
   folder,
@@ -125,7 +143,7 @@ export default function DateLogTimeline({
     )
   }
 
-  if (logs.length === 0) {
+  if (logs.length === 0 && pottings.length === 0) {
     return (
       <p className="rounded-lg bg-surface-container px-3 py-6 text-center text-sm text-on-surface-variant">
         No log entries yet.
@@ -133,16 +151,72 @@ export default function DateLogTimeline({
     )
   }
 
+  // Potting events sit in the same newest-first list as the logs. A potting
+  // counts as already happened on its own date, so on a shared date the logs come
+  // first (they are newer in a descending list) and the potting after them.
+  const rows: Row[] = [
+    ...logs.map((log): Row => ({ kind: 'log', date: log.log_date, log })),
+    ...pottings.map((potting): Row => ({
+      kind: 'potting',
+      date: potting.potted_on,
+      potting,
+    })),
+  ].sort((a, b) => {
+    if (a.date !== b.date) return b.date.localeCompare(a.date)
+    return a.kind === b.kind ? 0 : a.kind === 'log' ? -1 : 1
+  })
+  const potLabel = new Map(pots.map((p) => [p.id, p.label]))
+  const showPhaseBadge = pottings.length > 0
+
   return (
     <>
     <ol className="relative ml-1.5 border-l-2 border-outline-variant">
-      {logs.map((log) => (
+      {rows.map((row) => {
+        if (row.kind === 'potting') {
+          const own = pots.filter((p) => p.potting_id === row.potting.id)
+          const plants = own.reduce((sum, p) => sum + p.plant_count, 0)
+          return (
+            <li
+              key={`potting-${row.potting.id}`}
+              className="relative pb-6 pl-6 last:pb-0"
+            >
+              <span className="absolute -left-[7px] top-1 size-3 rounded-full bg-secondary ring-4 ring-background" />
+              <time className="text-xs font-medium text-on-surface-variant">
+                {formatLogDate(row.potting.potted_on)}
+              </time>
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-on-surface">
+                <Sprout className="size-4 text-secondary" />
+                Potted {plantsLabel(plants)} into {potsLabel(own.length)}
+              </p>
+              {row.potting.notes && (
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-on-surface-variant">
+                  {row.potting.notes}
+                </p>
+              )}
+            </li>
+          )
+        }
+        const log = row.log
+        return (
         <li key={log.id} className="relative pb-6 pl-6 last:pb-0">
           <span className="absolute -left-[7px] top-1 size-3 rounded-full bg-primary ring-4 ring-background" />
           <div className="flex items-start justify-between gap-2">
-            <time className="text-xs font-medium text-on-surface-variant">
-              {formatLogDate(log.log_date)}
-            </time>
+            <div className="flex items-center gap-2">
+              <time className="text-xs font-medium text-on-surface-variant">
+                {formatLogDate(log.log_date)}
+              </time>
+              {(showPhaseBadge || log.phase === 'potted') && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    log.phase === 'potted'
+                      ? 'bg-secondary-container text-on-secondary-container'
+                      : 'bg-surface-variant text-on-surface-variant'
+                  }`}
+                >
+                  {log.phase === 'potted' ? 'Potted' : 'Propagation'}
+                </span>
+              )}
+            </div>
             <div className="flex shrink-0 gap-1">
               <Link
                 to={`/experiments/${experimentId}/logs/${log.id}/edit`}
@@ -176,15 +250,35 @@ export default function DateLogTimeline({
 
           {(() => {
             const stage = stageEntry(log)
+            const label = log.pot_id ? potLabel.get(log.pot_id) : undefined
+            const health =
+              log.health_good != null ||
+              log.health_ok != null ||
+              log.health_poor != null
             if (
               !log.watered &&
               !log.fertilized &&
               !stage &&
+              !health &&
+              !log.pot_id &&
               log.deaths_count === 0
             )
               return null
             return (
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-on-surface-variant">
+                {log.pot_id && (
+                  <span className="flex items-center gap-1 font-medium text-on-surface">
+                    <Flower2 className="size-3.5" />
+                    Pot: {label ?? 'removed pot'}
+                  </span>
+                )}
+                {health && (
+                  <span className="flex items-center gap-1">
+                    <HeartPulse className="size-3.5" />
+                    Health {log.health_good ?? 0} / {log.health_ok ?? 0} /{' '}
+                    {log.health_poor ?? 0}
+                  </span>
+                )}
                 {log.watered && (
                   <span className="flex items-center gap-1">
                     <Droplets className="size-3.5" />
@@ -269,7 +363,8 @@ export default function DateLogTimeline({
             </div>
           )}
         </li>
-      ))}
+        )
+      })}
     </ol>
       {zoomedUrl && (
         <ImageLightbox src={zoomedUrl} onClose={() => setZoomedUrl(null)} />

@@ -1,11 +1,19 @@
 import { ArrowLeft, Camera, Circle, Loader2, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom'
 import PhotoAnnotator from '../components/PhotoAnnotator'
 import { useAuth } from '../lib/hooks/useAuth'
+import { usePottings } from '../lib/hooks/usePottings'
 import { supabase } from '../lib/supabase'
 import { today } from '../lib/utils/care'
 import { uploadImage, validateImage } from '../lib/utils/image'
+import { potLogNewPath, pottedOnOf } from '../lib/utils/potLogs'
 import type { Experiment, Folder } from '../types/database'
 
 /**
@@ -13,12 +21,21 @@ import type { Experiment, Folder } from '../types/database'
  * the note is optional and everything else defaults. Entries land in the same
  * `date_logs` table as a full entry, so they show up in the normal timeline and
  * can be filled in later by editing.
+ *
+ * `?pot=<potId>` makes it a Phase 2 photo: the row is written with
+ * phase='potted' and that pot_id (every Phase 2 row needs a pot).
  */
 export default function QuickPhotoLogPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
   const { user } = useAuth()
+  const [params] = useSearchParams()
+  const potId = params.get('pot')
+  const { pottings, pots, loading: potsLoading } = usePottings(
+    potId && id ? [id] : [],
+  )
+  const pot = potId ? pots.find((p) => p.id === potId) : undefined
 
   const navState = location.state as {
     experiment?: Experiment
@@ -68,6 +85,17 @@ export default function QuickPhotoLogPage() {
       setError('Add a photo first.')
       return
     }
+    if (potId) {
+      const pottedOn = pottedOnOf(pot, pottings)
+      if (!pot) {
+        setError('That pot no longer exists.')
+        return
+      }
+      if (pottedOn && logDate < pottedOn) {
+        setError(`This pot was potted on ${pottedOn}; pick that date or later.`)
+        return
+      }
+    }
 
     setBusy(true)
     setError(null)
@@ -81,6 +109,7 @@ export default function QuickPhotoLogPage() {
         status_details: note.trim(),
         image_url: imageUrl,
         deaths_count: 0,
+        ...(pot ? { phase: 'potted' as const, pot_id: pot.id } : {}),
       })
       if (insertError) throw insertError
 
@@ -110,8 +139,20 @@ export default function QuickPhotoLogPage() {
         >
           <ArrowLeft className="size-5" />
         </Link>
-        <h1 className="text-xl font-medium text-on-surface">Quick photo</h1>
+        <h1 className="text-xl font-medium text-on-surface">
+          {potId ? 'Quick pot photo' : 'Quick photo'}
+        </h1>
       </div>
+
+      {potId && (
+        <p className="mb-4 text-sm text-on-surface-variant">
+          {potsLoading
+            ? 'Loading pot…'
+            : pot
+              ? `Pot: ${pot.label}`
+              : 'That pot was not found.'}
+        </p>
+      )}
 
       {navState?.experiment && (
         <p className="mb-4 text-sm text-on-surface-variant">
@@ -222,7 +263,7 @@ export default function QuickPhotoLogPage() {
             </Link>
             <button
               type="submit"
-              disabled={busy || !image}
+              disabled={busy || !image || (potId != null && !pot)}
               className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-on-primary disabled:opacity-60"
             >
               {busy && <Loader2 className="size-4 animate-spin" />}
@@ -233,7 +274,11 @@ export default function QuickPhotoLogPage() {
           <p className="text-center text-xs text-on-surface-variant">
             Need root length, leaves or losses?{' '}
             <Link
-              to={`/experiments/${id}/logs/new`}
+              to={
+                potId
+                  ? potLogNewPath(id, potId)
+                  : `/experiments/${id}/logs/new`
+              }
               state={navState}
               className="underline"
             >
