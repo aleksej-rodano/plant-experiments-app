@@ -20,10 +20,12 @@
 -- RLS runs through the parent experiment's owner (same pattern as date_logs).
 --
 -- create_potting(...) inserts a potting and all its pots atomically and refuses to
--- move more plants than Phase 1 still holds on the potting date:
---   remaining = experiments.plant_count
---             - sum(deaths_count) of live phase='propagation' logs dated <= potted_on
---             - sum(plant_count) of live pots whose live potting has potted_on <= potted_on
+-- move more plants than Phase 1 can spare. Phase 1 remaining only shrinks over time,
+-- so the binding limit is the LATEST point, not the potting date: a backdated potting
+-- must also leave room for every later potting and later Phase 1 death.
+--   free = experiments.plant_count
+--        - sum(deaths_count) of all live phase='propagation' logs
+--        - sum(plant_count) of all live pots in live pottings
 -- "Live" means deleted_at is null. SECURITY INVOKER, so RLS applies to the caller.
 --
 -- Idempotent and wrapped in a transaction: safe to run once, safe to re-run.
@@ -246,14 +248,14 @@ begin
     v_count := v_count + v_plants;
   end loop;
 
-  -- Phase 1 remaining as of the potting date.
+  -- Plants Phase 1 can spare: remaining at the latest point in time (remaining is
+  -- non-increasing, so this also covers the potting date and every later date).
   v_remaining := v_total
     - coalesce((
         select sum(l.deaths_count) from public.date_logs l
         where l.experiment_id = p_experiment_id
           and l.phase = 'propagation'
           and l.deleted_at is null
-          and l.log_date <= p_potted_on
       ), 0)
     - coalesce((
         select sum(p.plant_count) from public.pots p
@@ -261,12 +263,11 @@ begin
         where p.experiment_id = p_experiment_id
           and p.deleted_at is null
           and t.deleted_at is null
-          and t.potted_on <= p_potted_on
       ), 0);
 
   if v_count > v_remaining then
-    raise exception 'create_potting: cannot pot % plants, only % remain in Phase 1 on %',
-      v_count, greatest(v_remaining, 0), p_potted_on
+    raise exception 'create_potting: cannot pot % plants, only % can leave Phase 1 (after all logged deaths and other pottings)',
+      v_count, greatest(v_remaining, 0)
       using errcode = 'check_violation';
   end if;
 
