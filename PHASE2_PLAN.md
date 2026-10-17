@@ -54,7 +54,9 @@ can be added later without a redesign.
 - **Phase 2 deaths and health are recorded per pot.** A Phase 2 check-in targets one pot.
   Deaths need a pot so the pot's alive count stays correct. Experiment-level Phase 2
   numbers are sums over pots.
-- A check-in without a pot (photo / notes / watered / fertilized only) is allowed in Phase 2.
+- **Every Phase 2 check-in belongs to exactly one pot** (user decision): `pot_id` is
+  required for any `date_logs` row with `phase = 'potted'`, including photo-only, notes-only,
+  watered and fertilized entries. There are no experiment-wide Phase 2 entries.
 - A potting on date D counts as already happened for any Phase 1 check-in dated D.
 - Experiment survival keeps its current formula: `alive = plant_count − Σ all deaths_count`
   (Phase 1 and pot deaths both live in `deaths_count`). So survival math barely changes.
@@ -89,7 +91,8 @@ can be added later without a redesign.
 ### 4.3 Changes to `date_logs`
 - `phase text not null default 'propagation' check (phase in ('propagation','potted'))`
   — all existing rows backfill to `propagation`.
-- `pot_id uuid null references pots(id) on delete cascade` — set for per-pot Phase 2 logs.
+- `pot_id uuid null references pots(id) on delete cascade` — required for Phase 2 logs:
+  add `check (phase <> 'potted' or pot_id is not null)`; Phase 1 logs keep `pot_id` null.
 - `health_good int null`, `health_ok int null`, `health_poor int null`, each `>= 0`.
 - Existing `deaths_count` / `death_cause` are reused for pot deaths.
 
@@ -199,7 +202,7 @@ pottedShare           = Σ live pot.plant_count / plant_count    (informational)
 ### Stage 5 — Phase 2 check-ins
 - Extend `DateLogForm` / `AddDateLogPage` / `EditDateLogPage` to be phase-aware (phase is
   passed from the section the user adds the log from; default `propagation`).
-  Phase 2 form fields: date, **pot** selector (optional for photo/notes-only), plants died
+  Phase 2 form fields: date, **pot** selector (required), plants died
   (+ cause required if > 0, capped at `potAlive`), health counts good / ok / poor with a
   soft warning if their sum exceeds `potAlive`, photo, notes (optional).
   Phase 1 form keeps the root/leaf track sections; Phase 2 form hides them.
@@ -207,7 +210,9 @@ pottedShare           = Σ live pot.plant_count / plant_count    (informational)
   badge, and potting events shown as markers/rows in the timeline ("Potted 4 plants into
   2 pots").
 - Quick watered / fertilized buttons keep working in both phases; the row's phase follows
-  the section it is added from. QuickPhotoLogPage the same.
+  the section it is added from. In Phase 2 they live on each pot (per-pot buttons), since
+  every Phase 2 entry needs a pot; QuickPhotoLogPage in Phase 2 takes a pot too.
+  Add a CHECK so `phase = 'potted'` implies `pot_id is not null` (put it in Stage 2's SQL).
 - Care schedule: unchanged (decision 9).
 - Done when: Phase 2 logs can be added/edited/deleted, deaths reduce the pot's alive count
   and the experiment survival, validation caps work.
