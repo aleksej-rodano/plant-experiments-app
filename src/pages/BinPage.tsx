@@ -4,6 +4,8 @@ import {
   FlaskConical,
   FolderOpen,
   Loader2,
+  Sprout,
+  Flower2,
   NotebookPen,
   RotateCcw,
   Trash2,
@@ -22,6 +24,8 @@ import {
 const KIND_ICON: Record<BinKind, typeof FolderOpen> = {
   folder: FolderOpen,
   experiment: FlaskConical,
+  potting: Sprout,
+  pot: Flower2,
   date_log: FileText,
   note: NotebookPen,
 }
@@ -29,6 +33,8 @@ const KIND_ICON: Record<BinKind, typeof FolderOpen> = {
 const KIND_LABEL: Record<BinKind, string> = {
   folder: 'Folder',
   experiment: 'Experiment',
+  potting: 'Potting',
+  pot: 'Pot',
   date_log: 'Log entry',
   note: 'Note',
 }

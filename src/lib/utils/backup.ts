@@ -10,6 +10,8 @@ export interface BackupFile {
     date_logs: unknown[]
     feeding_logs: unknown[]
     notes: unknown[]
+    pottings: unknown[]
+    pots: unknown[]
   }
 }
 
@@ -23,19 +25,26 @@ export interface BackupFile {
  * soft-delete columns come along, so the bin state round-trips intact.
  */
 export async function buildBackup(): Promise<BackupFile> {
-  const [folders, experiments, dateLogs, feedingLogs, notes] = await Promise.all(
-    [
+  const [folders, experiments, dateLogs, feedingLogs, notes, pottings, pots] =
+    await Promise.all([
       supabase.from('folders').select().order('created_at'),
       supabase.from('experiments').select().order('created_at'),
       supabase.from('date_logs').select().order('created_at'),
       supabase.from('feeding_logs').select().order('created_at'),
       supabase.from('notes').select().order('created_at'),
-    ],
-  )
+      supabase.from('pottings').select().order('created_at'),
+      supabase.from('pots').select().order('created_at'),
+    ])
 
-  const first = [folders, experiments, dateLogs, feedingLogs, notes].find(
-    (r) => r.error,
-  )
+  const first = [
+    folders,
+    experiments,
+    dateLogs,
+    feedingLogs,
+    notes,
+    pottings,
+    pots,
+  ].find((r) => r.error)
   if (first?.error) throw first.error
 
   return {
@@ -48,6 +57,8 @@ export async function buildBackup(): Promise<BackupFile> {
       date_logs: dateLogs.data ?? [],
       feeding_logs: feedingLogs.data ?? [],
       notes: notes.data ?? [],
+      pottings: pottings.data ?? [],
+      pots: pots.data ?? [],
     },
   }
 }

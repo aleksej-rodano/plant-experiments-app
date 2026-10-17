@@ -173,13 +173,22 @@ Working today:
 - **Bin** — deleting anything moves it to a bin you can restore from for 30 days,
   after which it and its photos are removed permanently
 - Fertilizer log, pest reference, tips, and notes
+- **Phase 2 (potting) — schema only, no UI yet.** The database now has `pottings`
+  (a potting event on a date) and `pots` (individual pots, each with its own
+  plant count and photo), plus `phase` / `pot_id` / `health_good|ok|poor` on
+  check-ins and an atomic `create_potting` RPC that refuses to pot more plants
+  than Phase 1 still holds. Pottings and pots already go through the bin
+  (delete/restore/purge, pot photos included) and are included in the JSON
+  backup. The screens come in the next stages — see `PHASE2_PLAN.md`.
 
 Photos are automatically shrunk before upload so saving stays fast.
 
 Database changes live in `db/` as dated SQL files. They are idempotent and
 transaction-wrapped, and you run them yourself in the Supabase SQL editor — the
 app expects the columns they add, so a new one has to be run before the features
-in that release will work.
+in that release will work. The newest is `db/2026-10-17_phase2_potting.sql`
+(Phase 2 potting tables, `date_logs` phase columns, RLS and `create_potting`);
+it has already been applied to the live project.
 
 ## Future steps
 

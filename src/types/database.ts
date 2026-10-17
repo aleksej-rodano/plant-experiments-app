@@ -3,6 +3,19 @@
 
 export type ExperimentStatus = 'ongoing' | 'succeeded' | 'failed'
 
+/** Phase of a check-in: 'propagation' = Phase 1, 'potted' = Phase 2. */
+export type LogPhase = 'propagation' | 'potted'
+
+/** One pot in a `create_potting` call. A blank label becomes "Pot N". */
+export interface PotInput {
+  label?: string | null
+  plant_count: number
+  pot_size?: string | null
+  substrate?: string | null
+  notes?: string | null
+  image_url?: string | null
+}
+
 // Soft-delete bookkeeping (see db/2026-08-31_soft_delete_bin.sql) is repeated
 // inline on every binnable table below rather than mixed in as an intersection:
 // supabase-js infers its query result types from these shapes, and an
@@ -123,6 +136,14 @@ export interface Database {
           death_cause: string | null
           watered: boolean
           fertilized: boolean
+          /** 'propagation' (Phase 1) or 'potted' (Phase 2). See PHASE2_PLAN.md. */
+          phase: LogPhase
+          /** Required when phase = 'potted' (DB CHECK); null for Phase 1 logs. */
+          pot_id: string | null
+          /** Phase 2 health tally for the pot at this check-in. */
+          health_good: number | null
+          health_ok: number | null
+          health_poor: number | null
           created_at: string
           updated_at: string
           deleted_at: string | null
@@ -135,6 +156,11 @@ export interface Database {
           log_date: string
           status_details: string
           image_url?: string | null
+          phase?: LogPhase
+          pot_id?: string | null
+          health_good?: number | null
+          health_ok?: number | null
+          health_poor?: number | null
           r0_count?: number | null
           r1_count?: number | null
           r2_count?: number | null
@@ -154,6 +180,69 @@ export interface Database {
           deleted_root?: boolean
         }
         Update: Partial<Database['public']['Tables']['date_logs']['Insert']>
+        Relationships: []
+      }
+      pottings: {
+        Row: {
+          id: string
+          experiment_id: string
+          potted_on: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+          delete_batch_id: string | null
+          deleted_root: boolean
+        }
+        Insert: {
+          id?: string
+          experiment_id: string
+          potted_on?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+          delete_batch_id?: string | null
+          deleted_root?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['pottings']['Insert']>
+        Relationships: []
+      }
+      pots: {
+        Row: {
+          id: string
+          experiment_id: string
+          potting_id: string
+          label: string
+          /** Plants put in this pot (>= 1). Pots are not plants. */
+          plant_count: number
+          pot_size: string | null
+          substrate: string | null
+          notes: string | null
+          image_url: string | null
+          created_at: string
+          updated_at: string
+          deleted_at: string | null
+          delete_batch_id: string | null
+          deleted_root: boolean
+        }
+        Insert: {
+          id?: string
+          experiment_id: string
+          potting_id: string
+          label: string
+          plant_count: number
+          pot_size?: string | null
+          substrate?: string | null
+          notes?: string | null
+          image_url?: string | null
+          created_at?: string
+          updated_at?: string
+          deleted_at?: string | null
+          delete_batch_id?: string | null
+          deleted_root?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['pots']['Insert']>
         Relationships: []
       }
       pest_guides: {
@@ -238,7 +327,22 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      /**
+       * Atomically inserts a potting and all its pots; raises if the plants moved
+       * exceed Phase 1 remaining on `p_potted_on`. Each p_pots element:
+       * { label?, plant_count, pot_size?, substrate?, notes?, image_url? }.
+       */
+      create_potting: {
+        Args: {
+          p_experiment_id: string
+          p_potted_on: string
+          p_notes: string | null
+          p_pots: PotInput[]
+        }
+        Returns: string
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }
@@ -247,6 +351,8 @@ export interface Database {
 export type Folder = Database['public']['Tables']['folders']['Row']
 export type Experiment = Database['public']['Tables']['experiments']['Row']
 export type DateLog = Database['public']['Tables']['date_logs']['Row']
+export type Potting = Database['public']['Tables']['pottings']['Row']
+export type Pot = Database['public']['Tables']['pots']['Row']
 export type PestGuide = Database['public']['Tables']['pest_guides']['Row']
 export type Tip = Database['public']['Tables']['tips']['Row']
 export type Note = Database['public']['Tables']['notes']['Row']
