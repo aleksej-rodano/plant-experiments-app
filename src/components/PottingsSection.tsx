@@ -30,8 +30,9 @@ function formatDate(value: string) {
 }
 
 /**
- * The experiment's potting events and their pots. Plain and self-contained so
- * it can move into the Phase 2 tab later: renders nothing without a potting.
+ * The experiment's potting events and their pots (the pot list of the Phase 2
+ * tab): photo, label, alive / in pot, size, substrate, last check-in and the
+ * per-pot actions. Renders nothing without a potting.
  */
 export default function PottingsSection({
   experimentId,
@@ -127,9 +128,24 @@ export default function PottingsSection({
 
               <ul className="mt-3 flex flex-col gap-2">
                 {own.map((pot) => {
-                  const detail = [pot.pot_size, pot.substrate]
+                  const detail = [
+                    pot.pot_size && `Size ${pot.pot_size}`,
+                    pot.substrate && `Substrate ${pot.substrate}`,
+                  ]
                     .filter(Boolean)
                     .join(' · ')
+                  const lastCheckIn = phaseInput.logs
+                    .filter(
+                      (l) =>
+                        l.pot_id === pot.id && !l.deleted_at,
+                    )
+                    .reduce<string | null>(
+                      (latest, l) =>
+                        latest == null || l.log_date > latest
+                          ? l.log_date
+                          : latest,
+                      null,
+                    )
                   const careBusy = careKey?.startsWith(`${pot.id}:`) ?? false
                   return (
                     <li
@@ -152,8 +168,17 @@ export default function PottingsSection({
                             {pot.label}
                           </p>
                           <p className="text-xs text-on-surface-variant">
-                            {potAlive(phaseInput, pot)}/{pot.plant_count} alive
-                            {detail && ` · ${detail}`}
+                            {potAlive(phaseInput, pot)}/{pot.plant_count} alive in pot
+                          </p>
+                          {detail && (
+                            <p className="text-xs text-on-surface-variant">
+                              {detail}
+                            </p>
+                          )}
+                          <p className="text-xs text-on-surface-variant">
+                            {lastCheckIn
+                              ? `Last check-in ${formatDate(lastCheckIn)}`
+                              : 'No check-ins yet'}
                           </p>
                         </div>
                         <Link

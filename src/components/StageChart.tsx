@@ -3,7 +3,13 @@ import { ROOT_STAGES, SHOOT_STAGES, stageTrend } from '../lib/utils/stages'
 import type { DateLog } from '../types/database'
 
 interface Props {
+  /**
+   * Phase 1 check-ins. Each stage entry already counts the plants still in
+   * Phase 1 on its date, so the bars shrink by themselves after a potting.
+   */
   logs: DateLog[]
+  /** Potting dates, drawn as a vertical line + label across the stage bars. */
+  pottings?: { id: string; potted_on: string }[]
 }
 
 // viewBox units; the SVG scales to its container.
@@ -21,6 +27,8 @@ const BAR_PW = VW - BAR_M.left - BAR_M.right
 // tracks; the leaf track then steps through a wide, high-contrast green ramp
 // so adjacent stages stay easy to tell apart at a glance.
 const ROOT_FILL = ['#cfd8dc', '#26a69a', '#00695c']
+// Potting marker: a warm tone that none of the stage ramps use.
+const MARKER = '#c2410c'
 const SHOOT_FILL = ['#cfd8dc', '#a5d6a7', '#4caf50', '#1b5e20']
 
 function StackedBars({
@@ -30,7 +38,9 @@ function StackedBars({
   labels,
   title,
   pick,
+  pottings = [],
 }: {
+  pottings?: { id: string; potted_on: string }[]
   trend: ReturnType<typeof stageTrend>
   fills: string[]
   codes: string[]
@@ -52,6 +62,26 @@ function StackedBars({
   const barW = Math.min(28, slot * 0.7)
   const labelEvery = n > 8 ? 3 : n > 5 ? 2 : 1
 
+  // A potting dated D has already happened for check-ins dated D, so its line
+  // sits in the gap before the first bar dated D or later (left edge when all
+  // bars are later, right edge when all are earlier). Pottings that land in the
+  // same gap stack their labels.
+  const markers = [...new Set(pottings.map((p) => p.potted_on))]
+    .sort()
+    .map((date) => ({
+      id: date,
+      date,
+      slot: trend.filter((t) => t.date < date).length,
+    }))
+  const stackAt = new Map<number, number>()
+  const placed = markers.map((m) => {
+    const k = stackAt.get(m.slot) ?? 0
+    stackAt.set(m.slot, k + 1)
+    return { ...m, k }
+  })
+  const topM = placed.length > 0 ? BAR_M.top + 6 + 8 * Math.max(...stackAt.values()) : BAR_M.top
+  const PHl = VH - topM - BAR_M.bottom
+
   return (
     <figure className="min-w-0 rounded-lg bg-surface-container p-3">
       <figcaption className="mb-1 text-xs text-on-surface-variant">
@@ -65,17 +95,17 @@ function StackedBars({
       >
         <line
           x1={BAR_M.left}
-          y1={BAR_M.top}
+          y1={topM}
           x2={BAR_M.left}
-          y2={BAR_M.top + PH}
+          y2={topM + PHl}
           stroke={AXIS}
           strokeWidth={1}
         />
         <line
           x1={BAR_M.left}
-          y1={BAR_M.top + PH}
+          y1={topM + PHl}
           x2={BAR_M.left + BAR_PW}
-          y2={BAR_M.top + PH}
+          y2={topM + PHl}
           stroke={AXIS}
           strokeWidth={1}
         />
@@ -83,15 +113,15 @@ function StackedBars({
           <g key={v}>
             <line
               x1={BAR_M.left}
-              y1={BAR_M.top + PH - (v / maxTotal) * PH}
+              y1={topM + PHl - (v / maxTotal) * PHl}
               x2={BAR_M.left + BAR_PW}
-              y2={BAR_M.top + PH - (v / maxTotal) * PH}
+              y2={topM + PHl - (v / maxTotal) * PHl}
               stroke={GRID}
               strokeWidth={0.5}
             />
             <text
               x={BAR_M.left - 4}
-              y={BAR_M.top + PH - (v / maxTotal) * PH}
+              y={topM + PHl - (v / maxTotal) * PHl}
               textAnchor="end"
               dominantBaseline="middle"
               fontSize={7}
@@ -102,14 +132,41 @@ function StackedBars({
           </g>
         ))}
 
+        {placed.map((m) => {
+          const x = BAR_M.left + m.slot * slot
+          const anchorEnd = m.slot > n / 2
+          return (
+            <g key={m.id}>
+              <line
+                x1={x}
+                y1={topM - 2}
+                x2={x}
+                y2={topM + PHl}
+                stroke={MARKER}
+                strokeWidth={1}
+                strokeDasharray="3 2"
+              />
+              <text
+                x={anchorEnd ? x - 2 : x + 2}
+                y={topM - 4 - 8 * m.k}
+                textAnchor={anchorEnd ? 'end' : 'start'}
+                fontSize={7}
+                fill={MARKER}
+              >
+                Potted {fmtDate(m.date)}
+              </text>
+            </g>
+          )
+        })}
+
         {trend.map((p, i) => {
           const counts = pick(p)
           const x = BAR_M.left + i * slot + (slot - barW) / 2
-          let yTop = BAR_M.top + PH
+          let yTop = topM + PHl
           return (
             <g key={`${p.date}-${i}`}>
               {counts.map((c, li) => {
-                const h = (c / maxTotal) * PH
+                const h = (c / maxTotal) * PHl
                 yTop -= h
                 return h > 0 ? (
                   <rect
@@ -125,8 +182,8 @@ function StackedBars({
               {(i % labelEvery === 0 || i === n - 1) && (
                 <text
                   x={x + barW / 2}
-                  y={BAR_M.top + PH + 10}
-                  transform={`rotate(-45 ${x + barW / 2} ${BAR_M.top + PH + 10})`}
+                  y={topM + PHl + 10}
+                  transform={`rotate(-45 ${x + barW / 2} ${topM + PHl + 10})`}
                   textAnchor="end"
                   fontSize={7}
                   fill={LABEL}
@@ -241,7 +298,7 @@ function CumulativeDeaths({ logs }: Props) {
  * running total of losses. Renders nothing until a check-in carries stage counts
  * or a loss.
  */
-export default function StageChart({ logs }: Props) {
+export default function StageChart({ logs, pottings }: Props) {
   const trend = stageTrend(logs)
   const anyDeaths = logs.some((l) => (l.deaths_count ?? 0) > 0)
   if (trend.length === 0 && !anyDeaths) return null
@@ -255,6 +312,7 @@ export default function StageChart({ logs }: Props) {
         labels={ROOT_STAGES.map((s) => s.label)}
         title="Root track"
         pick={(p) => p.root}
+        pottings={pottings}
       />
       <StackedBars
         trend={trend}
@@ -263,6 +321,7 @@ export default function StageChart({ logs }: Props) {
         labels={SHOOT_STAGES.map((s) => s.label)}
         title="Leaf track"
         pick={(p) => p.shoot}
+        pottings={pottings}
       />
       <CumulativeDeaths logs={logs} />
     </div>

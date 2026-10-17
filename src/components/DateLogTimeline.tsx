@@ -21,6 +21,7 @@ import type {
   DateLog,
   Experiment,
   Folder,
+  LogPhase,
   Pot,
   Potting,
 } from '../types/database'
@@ -42,6 +43,15 @@ interface Props {
   folder?: Folder | null
   /** Fires with the current list after every load and after a delete. */
   onLogsChange?: (logs: DateLog[]) => void
+  /**
+   * Show only one phase's entries (the experiment page's tabs). Potting events
+   * stay in the list either way; `onLogsChange` still receives every log.
+   */
+  phase?: LogPhase
+  /** With `phase="potted"`: only this pot's check-ins and potting. */
+  potId?: string | null
+  /** Shown when the filtered list is empty. */
+  emptyText?: string
 }
 
 function formatLogDate(value: string) {
@@ -60,6 +70,9 @@ export default function DateLogTimeline({
   experiment,
   folder,
   onLogsChange,
+  phase,
+  potId,
+  emptyText = 'No log entries yet.',
 }: Props) {
   const [logs, setLogs] = useState<DateLog[]>(initialLogs ?? [])
   const [loading, setLoading] = useState(initialLogs == null)
@@ -143,20 +156,23 @@ export default function DateLogTimeline({
     )
   }
 
-  if (logs.length === 0 && pottings.length === 0) {
-    return (
-      <p className="rounded-lg bg-surface-container px-3 py-6 text-center text-sm text-on-surface-variant">
-        No log entries yet.
-      </p>
-    )
-  }
-
   // Potting events sit in the same newest-first list as the logs. A potting
   // counts as already happened on its own date, so on a shared date the logs come
   // first (they are newer in a descending list) and the potting after them.
+  const visibleLogs = logs.filter((l) => {
+    if (phase === 'potted') return l.phase === 'potted' && (!potId || l.pot_id === potId)
+    if (phase === 'propagation') return l.phase !== 'potted'
+    return true
+  })
+  const potPottingId = potId
+    ? pots.find((p) => p.id === potId)?.potting_id
+    : undefined
+  const visiblePottings = potId
+    ? pottings.filter((p) => p.id === potPottingId)
+    : pottings
   const rows: Row[] = [
-    ...logs.map((log): Row => ({ kind: 'log', date: log.log_date, log })),
-    ...pottings.map((potting): Row => ({
+    ...visibleLogs.map((log): Row => ({ kind: 'log', date: log.log_date, log })),
+    ...visiblePottings.map((potting): Row => ({
       kind: 'potting',
       date: potting.potted_on,
       potting,
@@ -166,7 +182,15 @@ export default function DateLogTimeline({
     return a.kind === b.kind ? 0 : a.kind === 'log' ? -1 : 1
   })
   const potLabel = new Map(pots.map((p) => [p.id, p.label]))
-  const showPhaseBadge = pottings.length > 0
+  const showPhaseBadge = pottings.length > 0 && phase == null
+
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-lg bg-surface-container px-3 py-6 text-center text-sm text-on-surface-variant">
+        {emptyText}
+      </p>
+    )
+  }
 
   return (
     <>
@@ -205,7 +229,7 @@ export default function DateLogTimeline({
               <time className="text-xs font-medium text-on-surface-variant">
                 {formatLogDate(log.log_date)}
               </time>
-              {(showPhaseBadge || log.phase === 'potted') && (
+              {(showPhaseBadge || (phase == null && log.phase === 'potted')) && (
                 <span
                   className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                     log.phase === 'potted'

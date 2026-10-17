@@ -13,13 +13,20 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import DateLogTimeline from '../components/DateLogTimeline'
+import PotHealthChart from '../components/PotHealthChart'
 import PottingsSection from '../components/PottingsSection'
 import StageChart from '../components/StageChart'
 import StageSnapshot from '../components/StageSnapshot'
 import { isNativeApp } from '../lib/native'
 import { usePottings } from '../lib/hooks/usePottings'
 import { supabase } from '../lib/supabase'
-import { phase1Cohort, type PhaseInput } from '../lib/utils/phases'
+import {
+  phase1Cohort,
+  phase1Spare,
+  phase2Alive,
+  type PhaseInput,
+} from '../lib/utils/phases'
+import { phase2Trend } from '../lib/utils/phase2Trend'
 import { binExperiment } from '../lib/utils/bin'
 import { exportExperimentToCSV } from '../lib/utils/csvExport'
 import {
@@ -45,6 +52,8 @@ function formatDate(value: string) {
     day: 'numeric',
   })
 }
+
+type PhaseTab = 'propagation' | 'potted'
 
 function BackLink({ to, label }: { to: string; label: string }) {
   return (
@@ -108,6 +117,49 @@ export default function ExperimentDetailPage() {
     }),
     [experiment?.plant_count, pottings, pots, timelineLogs],
   )
+
+  // Last tab per experiment — component state only, gone on reload. The Phase 2
+  // tab exists only once a potting does, so it falls back to Phase 1 without one.
+  const [tabByExperiment, setTabByExperiment] = useState<
+    Record<string, PhaseTab>
+  >({})
+  const [potFilter, setPotFilter] = useState<string | null>(null)
+  const hasPottings = pottings.length > 0
+  const tab: PhaseTab =
+    hasPottings && id && tabByExperiment[id] === 'potted'
+      ? 'potted'
+      : 'propagation'
+
+  const phase1Logs = useMemo(
+    () => timelineLogs.filter((l) => l.phase !== 'potted'),
+    [timelineLogs],
+  )
+  const trend = useMemo(
+    () => phase2Trend(phaseInput, timelineLogs, pots),
+    [phaseInput, timelineLogs, pots],
+  )
+  const sortedPots = useMemo(
+    () => [...pots].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    [pots],
+  )
+  const activePotFilter =
+    potFilter && pots.some((p) => p.id === potFilter) ? potFilter : null
+  // "In propagation X · Potted Y · Died Z": the three always add up to the
+  // original plant count (Phase 1 spare + alive in pots + every death).
+  const split = useMemo(() => {
+    const inPropagation = phase1Spare(phaseInput)
+    if (inPropagation == null) return null
+    return {
+      inPropagation,
+      potted: phase2Alive(phaseInput),
+      died: totalDeaths(timelineLogs),
+      pottedShare: Math.round(
+        (pots.reduce((sum, p) => sum + p.plant_count, 0) /
+          Math.max(1, experiment?.plant_count ?? 1)) *
+          100,
+      ),
+    }
+  }, [phaseInput, timelineLogs, pots, experiment?.plant_count])
 
   const stats = useMemo(() => {
     const initial = experiment?.plant_count ?? null
@@ -323,6 +375,18 @@ export default function ExperimentDetailPage() {
               </>
             )}
           </p>
+          {hasPottings && split && (
+            <p className="mt-0.5 text-sm text-on-surface-variant">
+              In propagation{' '}
+              <span className="font-medium text-on-surface">
+                {split.inPropagation}
+              </span>{' '}
+              · Potted{' '}
+              <span className="font-medium text-on-surface">{split.potted}</span>{' '}
+              · Died{' '}
+              <span className="font-medium text-on-surface">{split.died}</span>
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -414,44 +478,158 @@ export default function ExperimentDetailPage() {
         </p>
       )}
 
-      {timelineLogs.length > 0 && (
-        <div className="mt-4 flex flex-col gap-4">
-          <StageSnapshot
-            logs={timelineLogs}
-            population={(asOf) => phase1Cohort(phaseInput, asOf)}
-          />
-          <StageChart logs={timelineLogs} />
+      {hasPottings && (
+        <div
+          role="tablist"
+          aria-label="Experiment phase"
+          className="mt-4 flex gap-1 rounded-lg bg-surface-container p-1"
+        >
+          {(
+            [
+              ['propagation', 'Phase 1 — Propagation'],
+              ['potted', 'Phase 2 — Potted'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              id={`tab-${key}`}
+              aria-selected={tab === key}
+              aria-controls={`panel-${key}`}
+              onClick={() =>
+                setTabByExperiment((prev) => ({ ...prev, [experiment.id]: key }))
+              }
+              className={`min-h-11 flex-1 rounded-md px-2 py-2 text-center text-sm font-medium leading-tight ${
+                tab === key
+                  ? 'bg-primary text-on-primary'
+                  : 'text-on-surface-variant hover:bg-surface-variant'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       )}
 
-      <PottingsSection
-        experimentId={experiment.id}
-        pottings={pottings}
-        pots={pots}
-        phaseInput={phaseInput}
-        onDeleted={() => {
-          setPhaseRefresh((n) => n + 1)
-          setToast('Potting moved to the bin.')
-          setTimeout(() => setToast(null), 3000)
-        }}
-        onLogged={(message) => {
-          // Reload the timeline and the pot counts behind the new entry.
-          setPhaseRefresh((n) => n + 1)
-          setToast(message)
-          setTimeout(() => setToast(null), 3000)
-        }}
-      />
+      {tab === 'propagation' ? (
+        <div
+          role={hasPottings ? 'tabpanel' : undefined}
+          id="panel-propagation"
+          aria-labelledby={hasPottings ? 'tab-propagation' : undefined}
+        >
+          {phase1Logs.length > 0 && (
+            <div className="mt-4 flex flex-col gap-4">
+              <StageSnapshot
+                logs={phase1Logs}
+                population={(asOf) => phase1Cohort(phaseInput, asOf)}
+              />
+              <StageChart logs={phase1Logs} pottings={pottings} />
+            </div>
+          )}
 
-      <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">Timeline</h2>
-      <DateLogTimeline
-        key={phaseRefresh}
-        experimentId={experiment.id}
-        experiment={experiment}
-        folder={folder}
-        pottings={pottings}
-        pots={pots}
-        onLogsChange={handleLogsChange}
-      />
+          <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">
+            Timeline
+          </h2>
+          <DateLogTimeline
+            key={`p1-${phaseRefresh}`}
+            experimentId={experiment.id}
+            experiment={experiment}
+            folder={folder}
+            pottings={pottings}
+            pots={pots}
+            initialLogs={timelineLogs.length > 0 ? timelineLogs : undefined}
+            phase={hasPottings ? 'propagation' : undefined}
+            onLogsChange={handleLogsChange}
+          />
+        </div>
+      ) : (
+        <div role="tabpanel" id="panel-potted" aria-labelledby="tab-potted">
+          {split && (
+            <p className="mt-4 rounded-lg bg-surface-container px-3 py-2 text-sm text-on-surface-variant">
+              <span className="font-medium text-on-surface">
+                {split.potted} alive
+              </span>{' '}
+              in pots · {split.pottedShare}% of the original plants were potted
+            </p>
+          )}
+          {trend.length > 0 && (
+            <div className="mt-4">
+              <PotHealthChart trend={trend} />
+            </div>
+          )}
+
+          <PottingsSection
+            experimentId={experiment.id}
+            pottings={pottings}
+            pots={pots}
+            phaseInput={phaseInput}
+            onDeleted={() => {
+              setPhaseRefresh((n) => n + 1)
+              setToast('Potting moved to the bin.')
+              setTimeout(() => setToast(null), 3000)
+            }}
+            onLogged={(message) => {
+              // Reload the timeline and the pot counts behind the new entry.
+              setPhaseRefresh((n) => n + 1)
+              setToast(message)
+              setTimeout(() => setToast(null), 3000)
+            }}
+          />
+
+          <h2 className="mt-6 mb-3 text-lg font-medium text-on-surface">
+            Pot timeline
+          </h2>
+          {sortedPots.length > 1 && (
+            <div
+              className="mb-3 flex flex-wrap gap-2"
+              role="group"
+              aria-label="Filter the pot timeline"
+            >
+              <button
+                type="button"
+                aria-pressed={activePotFilter == null}
+                onClick={() => setPotFilter(null)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                  activePotFilter == null
+                    ? 'bg-secondary-container text-on-secondary-container'
+                    : 'text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant'
+                }`}
+              >
+                All pots
+              </button>
+              {sortedPots.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  aria-pressed={activePotFilter === p.id}
+                  onClick={() => setPotFilter(p.id)}
+                  className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+                    activePotFilter === p.id
+                      ? 'bg-secondary-container text-on-secondary-container'
+                      : 'text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <DateLogTimeline
+            key={`p2-${phaseRefresh}`}
+            experimentId={experiment.id}
+            experiment={experiment}
+            folder={folder}
+            pottings={pottings}
+            pots={pots}
+            initialLogs={timelineLogs.length > 0 ? timelineLogs : undefined}
+            phase="potted"
+            potId={activePotFilter}
+            emptyText="No pot check-ins yet. Use Add check-in on a pot."
+            onLogsChange={handleLogsChange}
+          />
+        </div>
+      )}
 
       <div className="mt-8 border-t border-outline-variant pt-4">
         {confirmingDelete ? (
