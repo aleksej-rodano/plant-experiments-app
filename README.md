@@ -50,7 +50,88 @@ before upload, so the marked-up photo is what lands in the log.
 From an experiment you can tap **Export PDF** for a shareable report with the
 batch details, notes, and every log entry with its photos, or **CSV** to get the
 same log entries as a spreadsheet. A folder has its own CSV export covering all
-of its experiments in one sheet.
+of its experiments in one sheet. Experiments that have been potted export more
+(see [Exports](#exports) below).
+
+## Two phases: propagation and potted
+
+An experiment lives on one timeline in two phases:
+
+- **Phase 1 — Propagation**: everything above (root track R0–R2, leaf track
+  S0–S3, deaths).
+- **Phase 2 — Potted**: plants that were moved into pots.
+
+Plants move from Phase 1 to Phase 2 through **potting events**. A potting is
+partial or total, happens on a date and creates one or more **pots**. Tap **Pot
+plants** on an experiment: pick the date, then add a row per pot — label, how many
+plants go in it (one pot can hold several, so pots ≠ plants), optional size,
+substrate, notes and a photo. An experiment can have many pottings over time, and
+it keeps running in Phase 1 for the plants that were not moved. The page shows
+"up to X may be ready (R2: a, S3: b)" from the latest check-in — a hint only,
+nothing is enforced.
+
+On a folder, **Select experiments** → **Pot selected experiments** pots several
+experiments in one go: one shared date, optional shared size / substrate / notes
+copied into every pot row, then a section per experiment. Each experiment is saved
+on its own; if some fail, the rest are kept and the failed ones stay on screen for
+**Retry failed pottings**.
+
+Once an experiment has a potting its page has two tabs. **Phase 1** is the stage
+snapshot, the stage charts (with a dashed "Potted <date>" line) and the Phase 1
+timeline. **Phase 2** lists the pots (photo, alive / in pot, size, substrate, last
+check-in), a **Health in pots** chart and the pot timeline. Every Phase 2 check-in
+(deaths with cause, health good / ok / poor, photo, notes, watered, fertilized)
+belongs to exactly one pot — add it from the pot's own buttons. Pots are never
+regrouped and a plant cannot come back individually: deleting the whole potting
+event is the undo (it goes to the bin with its pots and their check-ins).
+There is no "succeeded" verdict for potting; the winner callout and ranking are
+Phase 1 / overall-survival based and unchanged.
+
+### How the plants are counted
+
+All of it lives in `src/lib/utils/phases.ts` (pure functions, worked examples in
+the file's header comment). With `plant_count` = N:
+
+```
+phase1Cohort(asOf)    = N − Σ pot.plant_count of pots potted on or before asOf
+phase1Remaining(asOf) = phase1Cohort(asOf) − Σ Phase 1 deaths on or before asOf
+phase1Spare           = N − Σ ALL Phase 1 deaths − Σ ALL live pots
+potAlive(pot, asOf)   = pot.plant_count − Σ deaths logged against that pot up to asOf
+phase2Alive(asOf)     = Σ potAlive over pots potted on or before asOf
+totalAlive            = N − Σ every death (Phase 1 and pot deaths)   — survival, unchanged
+pottedShare           = Σ live pot.plant_count / N                    — informational
+```
+
+A potting dated D counts as already happened for Phase 1 check-ins dated D.
+`phase1Cohort` is the denominator of the stage percentages and warnings (for an
+experiment without pottings it is simply N, so old data reads exactly as before);
+`phase1Remaining` is the "plants still in propagation" count.
+
+**Why `phase1Spare` and why the limit is the latest point in time.** Phase 1 only
+ever shrinks. The number of plants that can still *leave* it (by a potting or a
+Phase 1 death) is therefore set by the end of the timeline, not by the date of the
+entry being added: if 10 plants had 3 deaths on Jan 20 and a potting of 5 on Jan
+15, a new potting dated Jan 2 can take at most 2 — taking more would leave the
+later death and potting without plants, even though `phase1Remaining(Jan 2)` is
+10. So "plants available to pot", the cap on new / edited Phase 1 deaths and the
+`create_potting` database function all use `phase1Spare` (it is the same rule on
+both sides). Pot deaths are capped at `potAlive`; health counts above `potAlive`
+only warn.
+
+### Exports
+
+- **CSV** (web only; the Android shell hides the export buttons as before). The
+  log sheet gains `phase` (`propagation` / `potted`), `pot_label` and
+  `health_good`, `health_ok`, `health_poor` columns. When the experiment (or any
+  experiment in the folder) has pots, a second file `…-pots.csv` is downloaded
+  right after it: one row per pot with potting date, label, plants in pot, plants
+  alive, size, substrate, potting and pot notes, and photo URL.
+- **PDF**: unchanged for an experiment without pottings. With pottings, the
+  header gains "in propagation X · potted Y · died Z", the timeline becomes
+  "Phase 1 — Propagation timeline", and a **Phase 2 — Potted** section follows with
+  the potting events, the pot list (photo, alive of plants, size, substrate, last
+  check-in) and the Phase 2 timeline (pot, health, deaths, photos). It still
+  rasterises block by block, so nothing is split across pages.
 
 Each folder can carry a **recurring reminder** — a task like "Change water" every
 few days. The folder shows whether it's due or overdue with a **Mark done**
@@ -170,8 +251,12 @@ Working today:
   each morning until the task is marked done.
 - Editing a folder's details, description, and cover image
 - PDF and CSV export, per experiment and per folder
-- **Bin** — deleting anything moves it to a bin you can restore from for 30 days,
-  after which it and its photos are removed permanently
+- **Bin** — deleting anything (folders, experiments, pottings, single pots, log
+  entries, notes) moves it to a bin you can restore from for 30 days, after which
+  it and its photos are removed permanently. Restoring a potting (or pot, or a
+  Phase 1 death) re-checks the Phase 1 cap first: if you meanwhile potted those
+  plants again, the restore is refused with "Restoring this potting would put more
+  plants in pots than the experiment has; delete the newer potting first."
 - Fertilizer log, pest reference, tips, and notes
 - **Potting an experiment (Phase 2, Stage 4).** The experiment page has a
   **Pot plants** button → `/experiments/:id/pot`: a date, optional notes and a
@@ -273,9 +358,14 @@ Photos are automatically shrunk before upload so saving stays fast.
 Database changes live in `db/` as dated SQL files. They are idempotent and
 transaction-wrapped, and you run them yourself in the Supabase SQL editor — the
 app expects the columns they add, so a new one has to be run before the features
-in that release will work. The newest is `db/2026-10-17_phase2_potting.sql`
-(Phase 2 potting tables, `date_logs` phase columns, RLS and `create_potting`);
-it has already been applied to the live project.
+in that release will work. The newest is `db/2026-10-17_phase2_potting.sql`:
+the `pottings` and `pots` tables (soft-delete columns, RLS on the owning
+experiment), `date_logs.phase` (`propagation` | `potted`, existing rows backfill
+to `propagation`), `date_logs.pot_id` with a CHECK that Phase 2 rows always have a
+pot, `date_logs.health_good|ok|poor`, and the `create_potting` function (one
+transaction per potting, `security invoker`, capped at `phase1Spare`). It has
+already been applied to the live project; run it on a fresh Supabase project
+before using Phase 2 there.
 
 ## Future steps
 

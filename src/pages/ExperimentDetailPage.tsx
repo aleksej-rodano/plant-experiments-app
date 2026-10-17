@@ -259,11 +259,17 @@ export default function ExperimentDetailPage() {
       if (error) throw new Error(error.message)
 
       if (format === 'csv') {
-        exportExperimentToCSV(experiment, data ?? [], folder)
+        exportExperimentToCSV(experiment, data ?? [], folder, pottings, pots)
       } else {
         // Lazy-loaded: keeps jspdf + html2canvas (~1 MB) out of the initial bundle.
         const { exportExperimentToPDF } = await import('../lib/utils/pdfExport')
-        await exportExperimentToPDF(experiment, data ?? [], folder)
+        await exportExperimentToPDF(
+          experiment,
+          data ?? [],
+          folder,
+          pottings,
+          pots,
+        )
       }
     } catch (e) {
       setError(

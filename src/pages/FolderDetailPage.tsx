@@ -336,7 +336,7 @@ export default function FolderDetailPage() {
           {experiments.length > 0 && !isNativeApp() && (
             <button
               type="button"
-              onClick={() => exportFolderToCSV(folder, experiments, logs)}
+              onClick={() => exportFolderToCSV(folder, experiments, logs, pottings, pots)}
               title="Download every experiment in this folder as a CSV spreadsheet"
               className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-on-surface-variant ring-1 ring-outline hover:bg-surface-variant"
             >

@@ -1,4 +1,11 @@
-import type { DateLog, Experiment, Folder } from '../../types/database'
+import type {
+  DateLog,
+  Experiment,
+  Folder,
+  Pot,
+  Potting,
+} from '../../types/database'
+import { potAlive } from './phases'
 
 /**
  * RFC 4180 field escaping: wrap in quotes when the value contains a comma,
@@ -46,6 +53,8 @@ export function downloadCsv(text: string, filename: string): void {
 
 const LOG_HEADERS = [
   'log_date',
+  'phase',
+  'pot_label',
   'status_details',
   'watered',
   'fertilized',
@@ -59,12 +68,18 @@ const LOG_HEADERS = [
   'leafing_without_rooting',
   'deaths_count',
   'death_cause',
+  'health_good',
+  'health_ok',
+  'health_poor',
   'image_url',
 ]
 
-function logCells(log: DateLog): unknown[] {
+/** Phase 2 rows name their pot; Phase 1 rows leave the label blank. */
+function logCells(log: DateLog, potLabels: Map<string, string>): unknown[] {
   return [
     log.log_date,
+    log.phase ?? 'propagation',
+    log.pot_id ? (potLabels.get(log.pot_id) ?? '') : '',
     log.status_details,
     log.watered,
     log.fertilized,
@@ -78,8 +93,83 @@ function logCells(log: DateLog): unknown[] {
     log.leafing_without_rooting,
     log.deaths_count,
     log.death_cause,
+    log.health_good,
+    log.health_ok,
+    log.health_poor,
     log.image_url,
   ]
+}
+
+function potLabelMap(pots: Pot[]) {
+  return new Map(pots.map((p) => [p.id, p.label]))
+}
+
+const POT_HEADERS = [
+  'folder',
+  'experiment',
+  'potting_date',
+  'pot_label',
+  'plants_in_pot',
+  'plants_alive',
+  'pot_size',
+  'substrate',
+  'potting_notes',
+  'pot_notes',
+  'image_url',
+]
+
+/**
+ * One row per pot, as a second sheet. The log sheet only carries the pot label;
+ * everything about the pot itself (size, substrate, photo, how many plants went
+ * in and how many are still alive) lives here. Nothing is downloaded for
+ * experiments without pots.
+ */
+function exportPotsToCSV(
+  filename: string,
+  folderTitle: string,
+  experiments: Experiment[],
+  logs: DateLog[],
+  pottings: Potting[],
+  pots: Pot[],
+): void {
+  const pottingById = new Map(pottings.map((t) => [t.id, t]))
+  const expById = new Map(experiments.map((e) => [e.id, e]))
+  const rows = pots
+    .filter((p) => !p.deleted_at && pottingById.has(p.potting_id))
+    .map((pot) => {
+      const potting = pottingById.get(pot.potting_id)!
+      const exp = expById.get(pot.experiment_id)
+      const input = {
+        experiment: { plant_count: exp?.plant_count ?? null },
+        pottings,
+        pots,
+        logs: logs.filter((l) => l.experiment_id === pot.experiment_id),
+      }
+      return {
+        sort: [exp?.title ?? '', potting.potted_on, pot.created_at],
+        row: [
+          folderTitle,
+          exp?.title ?? '',
+          potting.potted_on,
+          pot.label,
+          pot.plant_count,
+          potAlive(input, pot),
+          pot.pot_size,
+          pot.substrate,
+          potting.notes,
+          pot.notes,
+          pot.image_url,
+        ],
+      }
+    })
+    .sort((a, b) =>
+      a.sort.join('|').localeCompare(b.sort.join('|')),
+    )
+    .map((r) => r.row)
+  if (rows.length === 0) return
+  // Two downloads back to back: the second waits a beat so browsers that allow
+  // "multiple downloads" per click don't drop it.
+  setTimeout(() => downloadCsv(toCsv(POT_HEADERS, rows), filename), 400)
 }
 
 /** One row per log entry for a single experiment. */
@@ -87,17 +177,26 @@ export function exportExperimentToCSV(
   experiment: Experiment,
   logs: DateLog[],
   folder?: Folder | null,
+  pottings: Potting[] = [],
+  pots: Pot[] = [],
 ): void {
   const headers = ['folder', 'experiment', 'plant_count', ...LOG_HEADERS]
+  const labels = potLabelMap(pots)
   const rows = logs.map((log) => [
     folder?.title ?? '',
     experiment.title,
     experiment.plant_count,
-    ...logCells(log),
+    ...logCells(log, labels),
   ])
-  downloadCsv(
-    toCsv(headers, rows),
-    `${slugify(experiment.title)}-${stamp()}.csv`,
+  const base = `${slugify(experiment.title)}-${stamp()}`
+  downloadCsv(toCsv(headers, rows), `${base}.csv`)
+  exportPotsToCSV(
+    `${base}-pots.csv`,
+    folder?.title ?? '',
+    [experiment],
+    logs,
+    pottings,
+    pots,
   )
 }
 
@@ -109,7 +208,10 @@ export function exportFolderToCSV(
   folder: Folder,
   experiments: Experiment[],
   logs: DateLog[],
+  pottings: Potting[] = [],
+  pots: Pot[] = [],
 ): void {
+  const labels = potLabelMap(pots)
   const byId = new Map(experiments.map((e) => [e.id, e]))
   const headers = [
     'folder',
@@ -134,7 +236,7 @@ export function exportFolderToCSV(
       exp?.started_on ?? '',
       exp?.status ?? '',
       exp?.plant_count,
-      ...logCells(log),
+      ...logCells(log, labels),
     ]
   })
 
@@ -152,5 +254,14 @@ export function exportFolderToCSV(
     ])
   }
 
-  downloadCsv(toCsv(headers, rows), `${slugify(folder.title)}-${stamp()}.csv`)
+  const base = `${slugify(folder.title)}-${stamp()}`
+  downloadCsv(toCsv(headers, rows), `${base}.csv`)
+  exportPotsToCSV(
+    `${base}-pots.csv`,
+    folder.title,
+    experiments,
+    logs,
+    pottings,
+    pots,
+  )
 }

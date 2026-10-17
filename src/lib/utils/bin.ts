@@ -9,6 +9,7 @@ import type {
 import { syncCareNotifications } from '../native'
 import { supabase } from '../supabase'
 import { removeStoredImages } from './image'
+import { phase1Shortfall, type PhaseInput } from './phases'
 
 /** How long a binned item can be restored before it's purged for good. */
 export const RETENTION_DAYS = 30
@@ -215,6 +216,7 @@ const CLEAR = { deleted_at: null, delete_batch_id: null, deleted_root: false }
  * pots and logs, because they carry the same batch id.
  */
 export async function restoreBatch(batchId: string): Promise<void> {
+  await assertPhase1Cap(batchId)
   for (const table of ALL_TABLES) {
     const { error } = await supabase
       .from(table)
@@ -224,6 +226,117 @@ export async function restoreBatch(batchId: string): Promise<void> {
   }
   await reviveAncestors(batchId)
   void syncCareNotifications()
+}
+
+/**
+ * Refuse a restore that would take more plants out of Phase 1 than the experiment
+ * has. Pottings and Phase 1 deaths draw on the same plants, so bin a potting, pot
+ * those plants again (or log more deaths), then restore the old potting and the
+ * plants would be counted twice. For every experiment the batch touches, the
+ * Phase 1 accounting is run "as if restored" — live rows plus the batch plus the
+ * pots / pottings `reviveAncestors` brings back for pot check-ins — and the
+ * restore is refused when that overdraws Phase 1 by more than it already was.
+ */
+async function assertPhase1Cap(batchId: string): Promise<void> {
+  const [bPottings, bPots, bLogs] = await Promise.all([
+    supabase.from('pottings').select().eq('delete_batch_id', batchId),
+    supabase.from('pots').select().eq('delete_batch_id', batchId),
+    supabase.from('date_logs').select().eq('delete_batch_id', batchId),
+  ])
+  for (const r of [bPottings, bPots, bLogs]) if (r.error) throw r.error
+
+  const batchPottings = bPottings.data ?? []
+  const batchPots = bPots.data ?? []
+  const batchLogs = bLogs.data ?? []
+  if (batchPottings.length + batchPots.length + batchLogs.length === 0) return
+
+  const expIds = [
+    ...new Set(
+      [...batchPottings, ...batchPots, ...batchLogs].map((r) => r.experiment_id),
+    ),
+  ]
+  // Pots that pot check-ins in this batch hang off; restoring them revives those.
+  const logPotIds = [
+    ...new Set(batchLogs.map((l) => l.pot_id).filter((id): id is string => !!id)),
+  ]
+  const [exps, livePottings, livePots, liveLogs, logPots] = await Promise.all([
+    supabase.from('experiments').select('id, plant_count').in('id', expIds),
+    supabase
+      .from('pottings')
+      .select()
+      .in('experiment_id', expIds)
+      .is('deleted_at', null),
+    supabase
+      .from('pots')
+      .select()
+      .in('experiment_id', expIds)
+      .is('deleted_at', null),
+    supabase
+      .from('date_logs')
+      .select()
+      .in('experiment_id', expIds)
+      .is('deleted_at', null),
+    logPotIds.length > 0
+      ? supabase.from('pots').select().in('id', logPotIds)
+      : Promise.resolve({ data: [] as typeof batchPots, error: null }),
+  ])
+  for (const r of [exps, livePottings, livePots, liveLogs, logPots])
+    if (r.error) throw r.error
+
+  const potsAfter = [
+    ...(livePots.data ?? []),
+    ...batchPots,
+    ...(logPots.data ?? []),
+  ]
+  const knownPottings = new Set([
+    ...(livePottings.data ?? []).map((t) => t.id),
+    ...batchPottings.map((t) => t.id),
+  ])
+  const missing = [
+    ...new Set(
+      potsAfter.map((p) => p.potting_id).filter((id) => !knownPottings.has(id)),
+    ),
+  ]
+  const extraPottings =
+    missing.length > 0
+      ? await supabase.from('pottings').select().in('id', missing)
+      : { data: [], error: null }
+  if (extraPottings.error) throw extraPottings.error
+
+  // Everything counts as live in the "after" picture; duplicates collapse by id.
+  const asLive = <T extends { id: string }>(rows: T[]) => {
+    const byId = new Map(rows.map((r) => [r.id, { ...r, deleted_at: null }]))
+    return [...byId.values()]
+  }
+  const pottingsAfter = asLive([
+    ...(livePottings.data ?? []),
+    ...batchPottings,
+    ...(extraPottings.data ?? []),
+  ])
+  const allPots = asLive(potsAfter)
+  const allLogs = asLive([...(liveLogs.data ?? []), ...batchLogs])
+
+  for (const exp of exps.data ?? []) {
+    const before: PhaseInput = {
+      experiment: exp,
+      pottings: (livePottings.data ?? []).filter((t) => t.experiment_id === exp.id),
+      pots: (livePots.data ?? []).filter((p) => p.experiment_id === exp.id),
+      logs: (liveLogs.data ?? []).filter((l) => l.experiment_id === exp.id),
+    }
+    const after: PhaseInput = {
+      experiment: exp,
+      pottings: pottingsAfter.filter((t) => t.experiment_id === exp.id),
+      pots: allPots.filter((p) => p.experiment_id === exp.id),
+      logs: allLogs.filter((l) => l.experiment_id === exp.id),
+    }
+    if (phase1Shortfall(after) > phase1Shortfall(before)) {
+      throw new Error(
+        batchPottings.length + batchPots.length + logPotIds.length > 0
+          ? 'Restoring this potting would put more plants in pots than the experiment has; delete the newer potting first.'
+          : 'Restoring this would account for more plants than the experiment has; remove a newer death or potting first.',
+      )
+    }
+  }
 }
 
 /**

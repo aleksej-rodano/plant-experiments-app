@@ -1,9 +1,11 @@
 # Phase 1 / Phase 2 (potting) — implementation plan
 
-Status: **PLAN ONLY — nothing built yet.** Each stage below is meant to be given to Claude
-on its own ("do Stage 3 of PHASE2_PLAN.md"). Stages are ordered; later ones depend on
+Status: **all 8 stages are built and on main** (2026-10-17). Each stage was given to Claude
+on its own ("do Stage 3 of PHASE2_PLAN.md"); stages are ordered and later ones depend on
 earlier ones. After every stage: `npm run build` (not only `tsc --noEmit`), commit, push
-to origin/main, update README in the same push.
+to origin/main, update README in the same push. Beyond the plan: StatsPage was removed
+earlier (its columns live in the folder comparison), and restoring a binned potting
+re-checks the Phase 1 cap (`assertPhase1Cap` in `bin.ts`).
 
 Project rules that apply to every stage (also in Claude's memory): push every change
 straight to main; run DB migrations yourself via Supabase MCP `execute_sql` (never ask the

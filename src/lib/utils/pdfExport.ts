@@ -1,6 +1,18 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import type { DateLog, Experiment, Folder } from '../../types/database'
+import type {
+  DateLog,
+  Experiment,
+  Folder,
+  Pot,
+  Potting,
+} from '../../types/database'
+import {
+  phase1Remaining,
+  phase2Alive,
+  potAlive,
+  type PhaseInput,
+} from './phases'
 import { stageEntry } from './stages'
 import { formatRate, successRate, survivorCount, totalDeaths } from './survival'
 
@@ -76,7 +88,9 @@ function makeBlock(html: string) {
 function buildTemplate(
   experiment: Experiment,
   dateLogs: DateLog[],
-  folder?: Folder | null,
+  folder: Folder | null | undefined,
+  pottings: Potting[],
+  pots: Pot[],
 ) {
   // Batch facts live on the folder now; fall back to any legacy values still on
   // the experiment row.
@@ -141,6 +155,21 @@ function buildTemplate(
       )}/${initialForRate} (${formatRate(successRate(initialForRate, deaths))})`,
     )
   }
+  const hasPottings = pottings.length > 0
+  const phaseInput: PhaseInput = {
+    experiment: { plant_count: experiment.plant_count },
+    pottings,
+    pots,
+    logs: dateLogs,
+  }
+  if (hasPottings && experiment.plant_count != null) {
+    const inPropagation = phase1Remaining(phaseInput, '9999-12-31') ?? 0
+    facts.push(
+      `<strong>Now:</strong> in propagation ${inPropagation} · potted ${phase2Alive(
+        phaseInput,
+      )} · died ${deaths}`,
+    )
+  }
   if (experiment.status) {
     facts.push(`<strong>Status:</strong> ${esc(experiment.status)}`)
   }
@@ -170,36 +199,58 @@ function buildTemplate(
     )
   }
 
-  const timelineHeading = `<h2 style="margin:0 0 12px;font-size:18px;font-weight:500">Timeline</h2>`
+  const phase1Logs = dateLogs.filter((l) => l.phase !== 'potted')
+  const potLogs = dateLogs.filter((l) => l.phase === 'potted')
+  const potLabels = new Map(pots.map((p) => [p.id, p.label]))
 
-  if (dateLogs.length === 0) {
-    blocks.push(
-      makeBlock(
-        `${timelineHeading}<p style="margin:0;color:#424940">No log entries.</p>`,
-      ),
+  const heading = (text: string) =>
+    `<h2 style="margin:0 0 12px;font-size:18px;font-weight:500">${text}</h2>`
+  const subheading = (text: string) =>
+    `<h3 style="margin:0 0 8px;font-size:15px;font-weight:500">${text}</h3>`
+
+  // Without pottings the PDF is exactly the single "Timeline" it always was.
+  const timelineHeading = heading(
+    hasPottings ? 'Phase 1 — Propagation timeline' : 'Timeline',
+  )
+
+  // A heading stays attached to the first block under it so it never orphans
+  // at the foot of a page.
+  const pushList = (items: string[], head: string, emptyText: string) => {
+    if (items.length === 0) {
+      blocks.push(
+        makeBlock(`${head}<p style="margin:0;color:#424940">${emptyText}</p>`),
+      )
+      return
+    }
+    items.forEach((item, i) =>
+      blocks.push(makeBlock(i === 0 ? head + item : item)),
     )
-  } else {
-    dateLogs.forEach((log, i) => {
-      const metrics: string[] = []
-      const stage = stageEntry(log)
-      if (stage) {
-        metrics.push(`Roots R0/R1/R2 ${stage.root.join(' / ')}`)
-        metrics.push(`Shoots S0/S1/S2/S3 ${stage.shoot.join(' / ')}`)
-        if (stage.leafingWithoutRooting > 0)
-          metrics.push(`${stage.leafingWithoutRooting} leafing without rooting`)
-      }
-      if (log.deaths_count > 0)
-        metrics.push(
-          `${esc(String(log.deaths_count))} died${
-            log.death_cause ? ` (${esc(log.death_cause)})` : ''
-          }`,
-        )
-      const item = `
+  }
+
+  const photo = (url: string | null) =>
+    url
+      ? `<img src="${esc(
+          url,
+        )}" style="display:block;margin-top:10px;max-width:100%;max-height:360px;object-fit:cover;border-radius:12px" />`
+      : ''
+
+  const deathText = (log: DateLog) =>
+    `${esc(String(log.deaths_count))} died${
+      log.death_cause ? ` (${esc(log.death_cause)})` : ''
+    }`
+
+  const logItem = (log: DateLog, metrics: string[]) => `
         <div style="border-top:1px solid #c2c9bd;padding-top:16px">
           <div style="font-size:12px;font-weight:700;color:#424940">${formatLogDate(
             log.log_date,
           )}</div>
-          <p style="white-space:pre-wrap;margin:6px 0 0">${esc(log.status_details)}</p>
+          ${
+            log.status_details
+              ? `<p style="white-space:pre-wrap;margin:6px 0 0">${esc(
+                  log.status_details,
+                )}</p>`
+              : ''
+          }
           ${
             metrics.length > 0
               ? `<div style="margin-top:6px;font-size:12px;color:#424940">${metrics.join(
@@ -207,18 +258,146 @@ function buildTemplate(
                 )}</div>`
               : ''
           }
+          ${photo(log.image_url)}
+        </div>`
+
+  const phase1Items = phase1Logs.map((log) => {
+    const metrics: string[] = []
+    const stage = stageEntry(log)
+    if (stage) {
+      metrics.push(`Roots R0/R1/R2 ${stage.root.join(' / ')}`)
+      metrics.push(`Shoots S0/S1/S2/S3 ${stage.shoot.join(' / ')}`)
+      if (stage.leafingWithoutRooting > 0)
+        metrics.push(`${stage.leafingWithoutRooting} leafing without rooting`)
+    }
+    if (log.deaths_count > 0) metrics.push(deathText(log))
+    return logItem(log, metrics)
+  })
+  pushList(phase1Items, timelineHeading, 'No log entries.')
+
+  if (hasPottings) {
+    const livePots = pots.filter((p) => !p.deleted_at)
+    const potsOf = (t: Potting) => livePots.filter((p) => p.potting_id === t.id)
+    const plantsIn = (list: Pot[]) =>
+      list.reduce((sum, p) => sum + p.plant_count, 0)
+    const plantWord = (n: number) => (n === 1 ? 'plant' : 'plants')
+    const potWord = (n: number) => (n === 1 ? 'pot' : 'pots')
+    const sortedPottings = [...pottings].sort((a, b) =>
+      a.potted_on.localeCompare(b.potted_on),
+    )
+
+    // Potting events.
+    const eventItems = sortedPottings.map((t) => {
+      const mine = potsOf(t)
+      const plants = plantsIn(mine)
+      return `
+        <div style="border-top:1px solid #c2c9bd;padding-top:12px">
+          <div style="font-size:13px"><strong>${formatLogDate(
+            t.potted_on,
+          )}</strong> — potted ${plants} ${plantWord(plants)} into ${
+            mine.length
+          } ${potWord(mine.length)}</div>
           ${
-            log.image_url
-              ? `<img src="${esc(
-                  log.image_url,
-                )}" style="display:block;margin-top:10px;max-width:100%;max-height:360px;object-fit:cover;border-radius:12px" />`
+            t.notes
+              ? `<p style="white-space:pre-wrap;margin:4px 0 0;font-size:12px;color:#424940">${esc(
+                  t.notes,
+                )}</p>`
               : ''
           }
         </div>`
-      // Keep the "Timeline" heading attached to the first entry so it never
-      // orphans at the foot of a page.
-      blocks.push(makeBlock(i === 0 ? timelineHeading + item : item))
     })
+    const pottedTotal = plantsIn(livePots)
+    pushList(
+      eventItems,
+      heading('Phase 2 — Potted') +
+        `<p style="margin:0 0 12px;font-size:13px;color:#424940">${pottedTotal} ${plantWord(
+          pottedTotal,
+        )} potted into ${livePots.length} ${potWord(
+          livePots.length,
+        )} · ${phase2Alive(phaseInput)} alive now</p>` +
+        subheading('Potting events'),
+      'No potting events.',
+    )
+
+    // Pot list: one block per pot so a photo never splits across pages.
+    const lastLog = new Map<string, string>()
+    for (const l of potLogs) {
+      if (l.pot_id && (lastLog.get(l.pot_id) ?? '') < l.log_date)
+        lastLog.set(l.pot_id, l.log_date)
+    }
+    const dateOf = new Map(sortedPottings.map((t) => [t.id, t.potted_on]))
+    const orderedPots = [...livePots].sort(
+      (a, b) =>
+        (dateOf.get(a.potting_id) ?? '').localeCompare(
+          dateOf.get(b.potting_id) ?? '',
+        ) || a.created_at.localeCompare(b.created_at),
+    )
+    const potItems = orderedPots.map((pot) => {
+      const details: string[] = [
+        `${potAlive(phaseInput, pot)} alive of ${pot.plant_count} ${plantWord(
+          pot.plant_count,
+        )}`,
+      ]
+      const pottedOn = dateOf.get(pot.potting_id)
+      if (pottedOn) details.push(`potted ${formatLogDate(pottedOn)}`)
+      if (pot.pot_size) details.push(`size ${esc(pot.pot_size)}`)
+      if (pot.substrate) details.push(`substrate ${esc(pot.substrate)}`)
+      const last = lastLog.get(pot.id)
+      details.push(
+        last ? `last check-in ${formatLogDate(last)}` : 'no check-ins yet',
+      )
+      return `
+        <div style="border-top:1px solid #c2c9bd;padding-top:12px;display:flex;gap:16px;align-items:flex-start">
+          ${
+            pot.image_url
+              ? `<img src="${esc(
+                  pot.image_url,
+                )}" style="width:150px;height:150px;object-fit:cover;border-radius:12px;flex:none" />`
+              : ''
+          }
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:700">${esc(pot.label)}</div>
+            <div style="margin-top:4px;font-size:12px;color:#424940">${details.join(
+              ' &nbsp;·&nbsp; ',
+            )}</div>
+            ${
+              pot.notes
+                ? `<p style="white-space:pre-wrap;margin:6px 0 0;font-size:12px">${esc(
+                    pot.notes,
+                  )}</p>`
+                : ''
+            }
+          </div>
+        </div>`
+    })
+    if (potItems.length > 0) pushList(potItems, subheading('Pots'), '')
+
+    // Phase 2 timeline: every check-in belongs to a pot.
+    const potTimeline = potLogs.map((log) => {
+      const metrics: string[] = [
+        `<strong>${esc(potLabels.get(log.pot_id ?? '') ?? 'Pot')}</strong>`,
+      ]
+      if (
+        log.health_good != null ||
+        log.health_ok != null ||
+        log.health_poor != null
+      ) {
+        metrics.push(
+          `Health good/ok/poor ${log.health_good ?? 0} / ${
+            log.health_ok ?? 0
+          } / ${log.health_poor ?? 0}`,
+        )
+      }
+      if (log.watered) metrics.push('Watered')
+      if (log.fertilized) metrics.push('Fertilized')
+      if (log.deaths_count > 0) metrics.push(deathText(log))
+      return logItem(log, metrics)
+    })
+    pushList(
+      potTimeline,
+      heading('Phase 2 — Potted timeline'),
+      'No pot check-ins yet.',
+    )
   }
 
   for (const block of blocks) container.appendChild(block)
@@ -249,6 +428,8 @@ export async function exportExperimentToPDF(
   experiment: Experiment,
   dateLogs: DateLog[],
   folder?: Folder | null,
+  pottings: Potting[] = [],
+  pots: Pot[] = [],
 ) {
   // Logs oldest-first for a chronological read.
   const ordered = [...dateLogs].sort((a, b) => {
@@ -256,7 +437,13 @@ export async function exportExperimentToPDF(
     return a.created_at < b.created_at ? -1 : 1
   })
 
-  const { container, blocks } = buildTemplate(experiment, ordered, folder)
+  const { container, blocks } = buildTemplate(
+    experiment,
+    ordered,
+    folder,
+    pottings,
+    pots,
+  )
   document.body.appendChild(container)
 
   try {

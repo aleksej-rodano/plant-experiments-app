@@ -181,6 +181,19 @@ export function phase1Spare(
 }
 
 /**
+ * How many plants Phase 1 is overdrawn by: the amount by which Phase 1 deaths plus
+ * pots exceed `plant_count`. Zero for a consistent experiment — `phase1Spare`
+ * clamps at zero and so cannot tell "none left" from "too many taken", this can.
+ * Used to refuse a bin restore that would double-count plants.
+ */
+export function phase1Shortfall(input: PhaseInput): number {
+  const total = input.experiment.plant_count
+  if (total == null) return 0
+  const potted = livePots(input).reduce((sum, p) => sum + p.plant_count, 0)
+  return Math.max(0, phase1Deaths(input) + potted - total)
+}
+
+/**
  * Plants alive in one pot: its plant count minus the deaths logged against it,
  * up to `asOf` (default: all of them). `excludeLogId` adds one log's deaths back
  * (the cap when editing that log). Zero for a pot that is binned or whose
